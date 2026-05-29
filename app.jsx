@@ -98,7 +98,10 @@ function App() {
     const stored = lsGet(LS.HABITS, null);
     return stored && Array.isArray(stored) && stored.length > 0 ? stored : seedHabits(new Date());
   });
-  const [me, setMe] = useState(() => lsGet(LS.ME, null) || window.Social.seedMe());
+  const [me, setMe] = useState(() => {
+    const stored = lsGet(LS.ME, null);
+    return (stored && typeof stored === 'object' && !Array.isArray(stored) && typeof stored.name === 'string') ? stored : window.Social.seedMe();
+  });
   const [friends, setFriends] = useState(() => {
     const stored = lsGet(LS.FRIENDS, null);
     return stored && Array.isArray(stored) && stored.length > 0 ? stored : window.Social.seedFriends(new Date());

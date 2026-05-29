@@ -48,8 +48,9 @@ function seedFriends(today) {
 
 // ---- read-only friend habit row (no check, no menu) ----
 function FriendHabitRow({ habit, today }) {
-  const { colorOf, dayKey, addDays, computeStreak } = window.HabitUtils;
+  const { colorOf, dayKey, addDays, computeStreak, getSchedule } = window.HabitUtils;
   const swatch = colorOf(habit.color);
+  const isWeekly = getSchedule(habit).type === 'weekly_count';
   const streak = computeStreak(habit, today, null);
   const todayKey = dayKey(today);
   const doneToday = !!habit.completions[todayKey];
@@ -64,7 +65,7 @@ function FriendHabitRow({ habit, today }) {
       <span className="swatch" style={{ background: swatch }} />
       <span className="friend-habit-name">{habit.name}</span>
       {doneToday && <span className="friend-today-dot" style={{ background: swatch }} title="done today" />}
-      {streak > 0 && <span className="friend-streak">{streak}d</span>}
+      {streak > 0 && <span className="friend-streak" title={`${streak} ${isWeekly ? 'week' : 'day'} streak`}>{streak}{isWeekly ? 'w' : 'd'}</span>}
       <span className="streak-dots" aria-label="Last 7 days">
         {dots.map((dot) => (
           <span
@@ -173,7 +174,7 @@ function FriendsScreen({ me, friends, today, onAddFriend, onRemoveFriend, onRena
         {editingName ? (
           <input className="text-input friends-me-input" value={nameDraft} autoFocus maxLength={24}
             onChange={(e) => setNameDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setNameDraft(me.name); setEditingName(false); } }}
             onBlur={saveName} />
         ) : (
           <button className="friends-me-name" onClick={() => setEditingName(true)}>you · {me.name}</button>
