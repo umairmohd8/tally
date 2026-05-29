@@ -3,7 +3,7 @@
 // ============================================
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
-const { HabitRow, AddHabitModal, PauseModal, CheckMark } = window.Components;
+const { HabitRow, HabitModal, PauseModal, CheckMark } = window.Components;
 const {
   RecoveryScreen, WeeklyReview, MVDButton, BodyDoubleCounter,
   pickToastLine, pickAllDoneLine, MVD_TOAST,
@@ -97,6 +97,7 @@ function App() {
   const [view, setView] = useState(() => initialPauseState.justEnded ? 'recovery' : 'today');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultTOD, setModalDefaultTOD] = useState(null);
+  const [editingHabit, setEditingHabit] = useState(null);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem(LS.THEME);
@@ -178,6 +179,12 @@ function App() {
     setModalOpen(false);
     setModalDefaultTOD(null);
     setTimeout(() => showToast(`Added · ${data.name}`), 100);
+  }, [showToast]);
+
+  const editHabit = useCallback((id, data) => {
+    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...data } : h));
+    setEditingHabit(null);
+    setTimeout(() => showToast(`Updated · ${data.name}`), 100);
   }, [showToast]);
 
   const deleteHabit = useCallback((id) => {
@@ -371,7 +378,7 @@ function App() {
                 </div>
                 <div className="habit-list">
                   {list.map(h => (
-                    <HabitRow key={h.id} habit={h} today={today} pause={pause} onToggle={toggle} onDelete={deleteHabit} onPausedTap={onPausedTap} />
+                    <HabitRow key={h.id} habit={h} today={today} pause={pause} onToggle={toggle} onDelete={deleteHabit} onEdit={setEditingHabit} onPausedTap={onPausedTap} />
                   ))}
                 </div>
               </div>
@@ -402,11 +409,13 @@ function App() {
         )
       )}
 
-      {/* Modal */}
-      {modalOpen && (
-        <AddHabitModal
-          onClose={() => { setModalOpen(false); setModalDefaultTOD(null); }}
-          onAdd={addHabit}
+      {/* Add / Edit habit modal */}
+      {(modalOpen || editingHabit) && (
+        <HabitModal
+          habit={editingHabit}
+          onClose={() => { setModalOpen(false); setModalDefaultTOD(null); setEditingHabit(null); }}
+          onSubmit={(data) => editingHabit ? editHabit(editingHabit.id, data) : addHabit(data)}
+          onArchive={editingHabit ? (id) => { deleteHabit(id); setEditingHabit(null); } : null}
           defaultTimeOfDay={modalDefaultTOD}
         />
       )}

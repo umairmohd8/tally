@@ -32,7 +32,30 @@ function getSchedule(habit) {
   if (habit && habit.schedule) return habit.schedule;
   return { type: 'daily' };
 }
+// ---- Deadline ----
+// habit.endDate is a "YYYY-MM-DD" dayKey = the LAST active day (inclusive). Absent = forever.
+function isEnded(habit, date) {
+  if (!habit || !habit.endDate) return false;
+  return dayKey(date) > habit.endDate;
+}
+// inclusive day count between two dayKeys ("2026-05-29")
+function dayCountBetween(startKey, endKey) {
+  try {
+    const s = new Date(startKey + 'T00:00:00');
+    const e = new Date(endKey + 'T00:00:00');
+    return Math.round((e - s) / 86400000) + 1;
+  } catch (_) { return 0; }
+}
+function endDateLabel(habit) {
+  if (!habit || !habit.endDate) return '';
+  try {
+    const d = new Date(habit.endDate + 'T00:00:00');
+    return d.toLocaleString('en', { month: 'short', day: 'numeric' }).toLowerCase();
+  } catch (_) { return habit.endDate; }
+}
+
 const isScheduled = (habit, date) => {
+  if (isEnded(habit, date)) return false;
   const sc = getSchedule(habit);
   if (sc.type === 'daily') return true;
   if (sc.type === 'specific_days') return (sc.days || []).includes(date.getDay());
@@ -148,6 +171,7 @@ window.HabitUtils = {
   getSchedule, isScheduled, scheduleLabel,
   computeStreak, slippedYesterday, weekCompletions,
   formatReminderTime, TOD_BUCKETS, isPausedOn,
+  isEnded, endDateLabel, dayCountBetween,
 };
 
 // ============================================
@@ -164,11 +188,11 @@ function CheckMark() {
 // ============================================
 // HABIT ROW · the hero interaction lives here
 // ============================================
-function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
+function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap }) {
   const {
     colorOf, dayKey, addDays, isScheduled, computeStreak,
     getSchedule, weekCompletions, scheduleLabel, formatReminderTime,
-    slippedYesterday, isPausedOn,
+    slippedYesterday, isPausedOn, isEnded, dayCountBetween,
   } = window.HabitUtils;
 
   const todayKey = dayKey(today);
@@ -182,6 +206,8 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
   const timeLabel = formatReminderTime(habit.reminderTime);
   const slipped = slippedYesterday(habit, today, pause);
   const pausedToday = isPausedOn(today, pause);
+  const ended = isEnded(habit, today);
+  const endedDays = ended && habit.endDate ? dayCountBetween(habit.createdAt || habit.endDate, habit.endDate) : 0;
 
   // 7-day dots
   const dots = [];
@@ -215,6 +241,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
 
   const handleToggle = (e) => {
     e?.stopPropagation();
+    if (ended) return;
     if (pausedToday) {
       onPausedTap && onPausedTap();
       return;
@@ -231,23 +258,32 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
 
   const scheduledToday = isScheduled(habit, today);
 
+  const handleEdit = (e) => {
+    e?.stopPropagation();
+    onEdit && onEdit(habit);
+  };
+
   return (
-    <div className={`habit ${done || weekMet ? 'done' : ''} ${!scheduledToday && !isWeekly ? 'rest' : ''} ${pausedToday ? 'paused' : ''}`} onClick={handleToggle} role="button" tabIndex={0}
-         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(e); } }}>
+    <div className={`habit ${done || weekMet ? 'done' : ''} ${!scheduledToday && !isWeekly && !ended ? 'rest' : ''} ${pausedToday ? 'paused' : ''} ${ended ? 'ended' : ''}`}>
       <button
         className={`check ${done ? 'checked' : ''} ${pulse ? 'pulse' : ''}`}
         onClick={handleToggle}
+        disabled={ended}
         aria-label={done ? `Mark ${habit.name} incomplete` : `Mark ${habit.name} complete`}
-        style={{ borderColor: done ? swatch : undefined, background: done ? swatch : undefined }}
+        style={{ borderColor: done && !ended ? swatch : undefined, background: done && !ended ? swatch : undefined }}
       >
         <CheckMark />
       </button>
 
-      <div className="habit-body">
+      <div className="habit-body" role="button" tabIndex={0} onClick={handleEdit}
+           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleEdit(e); } }}>
         <div className="habit-name">
           <span className="swatch" style={{ background: swatch }} />
           <span className="habit-name-text">{habit.name}</span>
-          {!scheduledToday && !isWeekly && (
+          {ended && (
+            <span className="meta-pill finished">{endedDays > 0 ? `done · ${endedDays} day${endedDays === 1 ? '' : 's'}` : 'finished'}</span>
+          )}
+          {!scheduledToday && !isWeekly && !ended && (
             <span className="meta-pill" style={{ background: 'transparent', color: 'var(--ink-30)', border: '1px solid var(--smoke)' }}>rest day</span>
           )}
           {slipped && !done && scheduledToday && !pausedToday && (
@@ -300,6 +336,17 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
             }}
           >
             <button
+              onClick={() => { onEdit && onEdit(habit); setMenuOpen(false); }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6,
+                fontSize: 13, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--card-2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <window.Icons.Edit size={13} /> Edit habit
+            </button>
+            <button
               onClick={() => { onDelete(habit.id); setMenuOpen(false); }}
               style={{
                 width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6,
@@ -318,16 +365,21 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onPausedTap }) {
 }
 
 // ============================================
-// ADD HABIT MODAL · time-of-day instead of section
+// HABIT MODAL · add + edit · time-of-day instead of section
 // ============================================
-function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
-  const [name, setName] = React.useState('');
-  const [color, setColor] = React.useState(COLORS[0].key);
-  const [timeOfDay, setTimeOfDay] = React.useState(defaultTimeOfDay || 'morning');
-  const [scheduleType, setScheduleType] = React.useState('daily');
-  const [weeklyCount, setWeeklyCount] = React.useState(3);
-  const [specificDays, setSpecificDays] = React.useState([1, 3, 5]);
-  const [reminderTime, setReminderTime] = React.useState('');
+function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
+  const { dayKey, addDays, dayCountBetween } = window.HabitUtils;
+  const isEdit = !!habit;
+  const sc0 = (habit && habit.schedule) || { type: 'daily' };
+
+  const [name, setName] = React.useState(habit ? habit.name : '');
+  const [color, setColor] = React.useState(habit ? habit.color : COLORS[0].key);
+  const [timeOfDay, setTimeOfDay] = React.useState(habit ? (habit.timeOfDay || 'whenever') : (defaultTimeOfDay || 'morning'));
+  const [scheduleType, setScheduleType] = React.useState(sc0.type || 'daily');
+  const [weeklyCount, setWeeklyCount] = React.useState(sc0.type === 'weekly_count' ? (sc0.count || 3) : 3);
+  const [specificDays, setSpecificDays] = React.useState(sc0.type === 'specific_days' ? (sc0.days || [1, 3, 5]) : [1, 3, 5]);
+  const [reminderTime, setReminderTime] = React.useState(habit && habit.reminderTime ? habit.reminderTime : '');
+  const [endDate, setEndDate] = React.useState(habit && habit.endDate ? habit.endDate : null);
   const inputRef = React.useRef(null);
   const timeRef = React.useRef(null);
 
@@ -355,26 +407,45 @@ function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
     return { type: 'daily' };
   };
 
+  // deadline helpers — N inclusive days counted from today, so "20 days" always means
+  // 20 days from now (a chip can never silently end an existing habit in the past).
+  const DURATIONS = [7, 14, 21, 30, 66];
+  const todayKey = dayKey(new Date());
+  const todayObj = new Date(todayKey + 'T00:00:00');
+  const setDuration = (n) => setEndDate(dayKey(addDays(todayObj, n - 1)));
+  const isDuration = (n) => endDate === dayKey(addDays(todayObj, n - 1));
+  const deadlineDays = endDate ? dayCountBetween(todayKey, endDate) : 0;
+  const deadlineLabel = () => {
+    if (!endDate) return 'runs forever';
+    try {
+      const d = new Date(endDate + 'T00:00:00');
+      const f = d.toLocaleString('en', { month: 'short', day: 'numeric' }).toLowerCase();
+      if (deadlineDays <= 0) return `ended ${f}`;
+      return `ends ${f} · ${deadlineDays} day${deadlineDays === 1 ? '' : 's'}`;
+    } catch (_) { return ''; }
+  };
+
   const submit = () => {
     if (!name.trim()) return;
-    onAdd({
+    onSubmit({
       name: name.trim(),
       color,
       timeOfDay,
       schedule: buildSchedule(),
       reminderTime: reminderTime || null,
+      endDate: endDate || null,
     });
   };
 
   const DAY_LETTERS = ['S','M','T','W','T','F','S'];
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Add habit">
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit habit' : 'Add habit'}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <div className="modal-eyebrow">New habit</div>
-            <div className="modal-title">What will you do?</div>
+            <div className="modal-eyebrow">{isEdit ? 'Edit habit' : 'New habit'}</div>
+            <div className="modal-title">{isEdit ? 'Tweak it' : 'What will you do?'}</div>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><window.Icons.X /></button>
         </div>
@@ -478,6 +549,37 @@ function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
           </div>
 
           <div className="field">
+            <div className="field-label">Deadline <span className="opt">· optional · ends after a stretch</span></div>
+            <div className="chip-row" role="group" aria-label="Deadline">
+              <button
+                className="chip"
+                aria-checked={!endDate}
+                role="radio"
+                onClick={() => setEndDate(null)}
+              >Runs forever</button>
+              {DURATIONS.map(n => (
+                <button
+                  key={n}
+                  role="radio"
+                  aria-checked={isDuration(n)}
+                  className="chip"
+                  onClick={() => setDuration(n)}
+                >{n} days</button>
+              ))}
+            </div>
+            <div className="time-field" style={{ marginTop: 8 }}>
+              <input
+                type="date"
+                value={endDate || ''}
+                min={todayKey}
+                onChange={(e) => setEndDate(e.target.value || null)}
+                aria-label="Custom end date"
+              />
+            </div>
+            <div className="deadline-summary">{deadlineLabel()}</div>
+          </div>
+
+          <div className="field">
             <div className="field-label">Reminder time <span className="opt">· optional</span></div>
             {reminderTime ? (
               <div className="time-field">
@@ -506,10 +608,17 @@ function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
         </div>
 
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!name.trim()} onClick={submit}>
-            Add habit
-          </button>
+          {isEdit && onArchive && (
+            <button className="btn btn-archive" onClick={() => onArchive(habit.id)} aria-label="Archive habit">
+              <window.Icons.Trash size={13} /> archive
+            </button>
+          )}
+          <div className="modal-foot-end">
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={!name.trim()} onClick={submit}>
+              {isEdit ? 'Save' : 'Add habit'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -617,13 +726,20 @@ function PauseModal({ onClose, onPause }) {
         </div>
 
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit}>Pause tally</button>
+          <div className="modal-foot-end">
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={submit}>Pause tally</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-window.Components = { HabitRow, AddHabitModal, PauseModal, CheckMark };
+// Back-compat alias: original AddHabitModal used onAdd; map it onto HabitModal's onSubmit.
+function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
+  return <HabitModal habit={null} onClose={onClose} onSubmit={onAdd} onArchive={null} defaultTimeOfDay={defaultTimeOfDay} />;
+}
+
+window.Components = { HabitRow, HabitModal, AddHabitModal, PauseModal, CheckMark };
 window.PauseMeta = { PAUSE_PRESETS, PAUSE_REASON_LABEL };
