@@ -20,6 +20,8 @@ const LS = {
   MVD:       'tally-mvd-logged',
   THEME:     'tally-theme',
   SEEN_WB:   'tally-seen-welcome-back',
+  ME:        'tally-me',
+  FRIENDS:   'tally-friends',
 };
 function lsGet(k, fallback) {
   try {
@@ -96,6 +98,11 @@ function App() {
     const stored = lsGet(LS.HABITS, null);
     return stored && Array.isArray(stored) && stored.length > 0 ? stored : seedHabits(new Date());
   });
+  const [me, setMe] = useState(() => lsGet(LS.ME, null) || window.Social.seedMe());
+  const [friends, setFriends] = useState(() => {
+    const stored = lsGet(LS.FRIENDS, null);
+    return stored && Array.isArray(stored) && stored.length > 0 ? stored : window.Social.seedFriends(new Date());
+  });
   const [tab, setTab] = useState('today');
   const [view, setView] = useState(() => initialPauseState.justEnded ? 'recovery' : 'today');
   const [modalOpen, setModalOpen] = useState(false);
@@ -115,6 +122,8 @@ function App() {
 
   // ---- persistence ----
   useEffect(() => { lsSet(LS.HABITS, habits); }, [habits]);
+  useEffect(() => { lsSet(LS.ME, me); }, [me]);
+  useEffect(() => { lsSet(LS.FRIENDS, friends); }, [friends]);
   useEffect(() => { lsSet(LS.PAUSE, pause); }, [pause]);
   useEffect(() => { lsSet(LS.MVD, mvdLogged); }, [mvdLogged]);
 
@@ -192,6 +201,17 @@ function App() {
 
   const deleteHabit = useCallback((id) => {
     setHabits(prev => prev.filter(h => h.id !== id));
+  }, []);
+
+  const addFriend = useCallback((name, color) => {
+    setFriends(prev => [...prev, window.Social.makeFriend(name, color, new Date())]);
+    setTimeout(() => showToast(`Added · ${name}`), 100);
+  }, [showToast]);
+  const removeFriend = useCallback((id) => {
+    setFriends(prev => prev.filter(f => f.id !== id));
+  }, []);
+  const renameMe = useCallback((name) => {
+    setMe(prev => ({ ...prev, name: (name || '').trim() || prev.name }));
   }, []);
 
   const logMVD = useCallback(() => {
@@ -285,6 +305,7 @@ function App() {
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={tab === 'today'} className="tab" onClick={() => setTab('today')}>Today</button>
             <button role="tab" aria-selected={tab === 'review'} className="tab" onClick={() => setTab('review')}>Review</button>
+            <button role="tab" aria-selected={tab === 'friends'} className="tab" onClick={() => setTab('friends')}>Friends</button>
           </div>
           {!pause && (
             <button
@@ -410,6 +431,17 @@ function App() {
         ) : (
           <WeeklyReview habits={habits} today={today} pause={pause} />
         )
+      )}
+
+      {tab === 'friends' && (
+        <window.Social.FriendsScreen
+          me={me}
+          friends={friends}
+          today={today}
+          onAddFriend={addFriend}
+          onRemoveFriend={removeFriend}
+          onRenameMe={renameMe}
+        />
       )}
 
       {/* Add / Edit habit modal */}
