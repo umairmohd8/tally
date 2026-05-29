@@ -283,6 +283,9 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
           {ended && (
             <span className="meta-pill finished">{endedDays > 0 ? `done · ${endedDays} day${endedDays === 1 ? '' : 's'}` : 'finished'}</span>
           )}
+          {habit.shared && (
+            <span className="meta-pill shared" title="Friends can see this habit">shared</span>
+          )}
           {!scheduledToday && !isWeekly && !ended && (
             <span className="meta-pill" style={{ background: 'transparent', color: 'var(--ink-30)', border: '1px solid var(--smoke)' }}>rest day</span>
           )}
@@ -380,6 +383,7 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
   const [specificDays, setSpecificDays] = React.useState(sc0.type === 'specific_days' ? (sc0.days || [1, 3, 5]) : [1, 3, 5]);
   const [reminderTime, setReminderTime] = React.useState(habit && habit.reminderTime ? habit.reminderTime : '');
   const [endDate, setEndDate] = React.useState(habit && habit.endDate ? habit.endDate : null);
+  const [shared, setShared] = React.useState(habit ? !!habit.shared : false);
   const inputRef = React.useRef(null);
   const timeRef = React.useRef(null);
 
@@ -434,6 +438,7 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
       schedule: buildSchedule(),
       reminderTime: reminderTime || null,
       endDate: endDate || null,
+      shared,
     });
   };
 
@@ -577,6 +582,14 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
               />
             </div>
             <div className="deadline-summary">{deadlineLabel()}</div>
+          </div>
+
+          <div className="field">
+            <div className="field-label">Sharing <span className="opt">· friends can see this one</span></div>
+            <div className="chip-row" role="radiogroup" aria-label="Sharing">
+              <button className="chip" role="radio" aria-checked={!shared} onClick={() => setShared(false)}>Private</button>
+              <button className="chip" role="radio" aria-checked={shared} onClick={() => setShared(true)}>Shared with friends</button>
+            </div>
           </div>
 
           <div className="field">

@@ -59,6 +59,9 @@ function seedHabits(today) {
   for (let i = 1; i < 8; i++) read.completions[dayKey(addDays(today, -i))] = true;
   const lang = mk('h6', 'Spanish · Duolingo', 'pop', { type: 'weekly_count', count: 5 }, 'evening', null, sparse);
 
+  read.shared = true;
+  run.shared = true;
+
   return [water, pages, run, stretch, read, lang];
 }
 
