@@ -9,3 +9,5 @@
 # Logs / scratch
 *.log
 .secret-pass
+
+.superpowers/
