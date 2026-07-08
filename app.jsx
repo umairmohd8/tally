@@ -106,6 +106,10 @@ function App() {
     const stored = lsGet(LS.FRIENDS, null);
     return stored && Array.isArray(stored) && stored.length > 0 ? stored : window.Social.seedFriends(new Date());
   });
+  const [session, setSession] = useState(null);
+  const [signInOpen, setSignInOpen] = useState(false);
+  const signedInRef = useRef(false);
+  useEffect(() => { signedInRef.current = !!session; }, [session]);
   const [tab, setTab] = useState('today');
   const [view, setView] = useState(() => initialPauseState.justEnded ? 'recovery' : 'today');
   const [modalOpen, setModalOpen] = useState(false);
@@ -142,15 +146,46 @@ function App() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2200);
   }, []);
 
+  // ---- auth init + load/migrate/subscribe on sign-in ----
+  const lastUserRef = useRef(null);
+  useEffect(() => {
+    if (!window.Sync.enabled()) return;
+    let unsubRealtime = () => {};
+    const sub = window.Sync.init(async (s) => {
+      setSession(s);
+      // Token refresh / tab refocus re-fire with the SAME user — only run the heavy
+      // sync flow (migrate/load/subscribe/toast) on an actual user change, and never
+      // leave two realtime channels open.
+      const userId = s ? s.user.id : null;
+      if (userId === lastUserRef.current) return;
+      lastUserRef.current = userId;
+      unsubRealtime(); unsubRealtime = () => {};
+      if (!s) return;
+      setSignInOpen(false); // phone-OTP path: close the sign-in modal once authenticated
+      try {
+        const uploaded = await window.Sync.migrateLocalHabits(lsGet(LS.HABITS, []));
+        const [cloudHabits, cloudMe] = await Promise.all([window.Sync.loadHabits(), window.Sync.loadProfile()]);
+        setHabits(cloudHabits);
+        if (cloudMe) setMe(cloudMe);
+        showToast(uploaded ? `Synced ${uploaded} habit${uploaded === 1 ? '' : 's'} to your account` : 'Synced. Welcome back.');
+        unsubRealtime = window.Sync.subscribe(s.user.id, async () => {
+          try { setHabits(await window.Sync.loadHabits()); } catch (_) {}
+        });
+      } catch (e) { showToast('Sync error — working offline'); }
+    });
+    return () => { sub.unsubscribe(); unsubRealtime(); };
+  }, [showToast]);
+
   // ---- toggle (hero interaction) ----
   const toggle = useCallback((id, dKeyOverride) => {
+    const dKey = dKeyOverride || dayKey(today);
+    let becameDone = null;
     setHabits(prev => prev.map(h => {
       if (h.id !== id) return h;
-      const dKey = dKeyOverride || dayKey(today);
       const cmp = { ...h.completions };
       const wasDone = !!cmp[dKey];
-      if (wasDone) delete cmp[dKey];
-      else cmp[dKey] = true;
+      if (wasDone) delete cmp[dKey]; else cmp[dKey] = true;
+      becameDone = !wasDone;
       if (!wasDone) {
         setTimeout(() => {
           const streakNow = computeStreak({ ...h, completions: cmp }, today, pause);
@@ -159,6 +194,9 @@ function App() {
       }
       return { ...h, completions: cmp };
     }));
+    if (signedInRef.current && becameDone !== null) {
+      window.Sync.setCompletion(id, dKey, becameDone).catch(() => {});
+    }
   }, [today, showToast, pause]);
 
   // ---- pause actions ----
@@ -185,25 +223,27 @@ function App() {
 
   // ---- add ----
   const addHabit = useCallback((data) => {
-    setHabits(prev => [...prev, {
-      id: 'h' + Date.now(),
-      ...data,
-      completions: {},
-      createdAt: dayKey(new Date()),
-    }]);
-    setModalOpen(false);
-    setModalDefaultTOD(null);
+    const habit = {
+      id: window.Sync.uuid(),
+      ...data, completions: {}, createdAt: dayKey(new Date()),
+    };
+    setHabits(prev => [...prev, habit]);
+    setModalOpen(false); setModalDefaultTOD(null);
+    if (signedInRef.current) window.Sync.insertHabit(habit).catch(() => {});
     setTimeout(() => showToast(`Added · ${data.name}`), 100);
   }, [showToast]);
 
   const editHabit = useCallback((id, data) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...data } : h));
+    let merged = null;
+    setHabits(prev => prev.map(h => { if (h.id !== id) return h; merged = { ...h, ...data }; return merged; }));
     setEditingHabit(null);
+    if (signedInRef.current && merged) window.Sync.updateHabit(merged).catch(() => {});
     setTimeout(() => showToast(`Updated · ${data.name}`), 100);
   }, [showToast]);
 
   const deleteHabit = useCallback((id) => {
     setHabits(prev => prev.filter(h => h.id !== id));
+    if (signedInRef.current) window.Sync.softDeleteHabit(id).catch(() => {});
   }, []);
 
   const addFriend = useCallback((name, color) => {
@@ -214,8 +254,14 @@ function App() {
     setFriends(prev => prev.filter(f => f.id !== id));
   }, []);
   const renameMe = useCallback((name) => {
-    setMe(prev => ({ ...prev, name: (name || '').trim() || prev.name }));
+    setMe(prev => {
+      const next = { ...prev, name: (name || '').trim() || prev.name };
+      if (signedInRef.current) window.Sync.saveProfile(next).catch(() => {});
+      return next;
+    });
   }, []);
+
+  const signOut = useCallback(async () => { try { await window.Sync.signOut(); } catch (_) {} setSession(null); showToast('Signed out · still on this device'); }, [showToast]);
 
   const logMVD = useCallback(() => {
     setMvdLogged(prev => ({ ...prev, [dayKey(today)]: true }));
@@ -320,6 +366,7 @@ function App() {
               <window.Icons.Pause />
             </button>
           )}
+          <window.Auth.AccountControl session={session} me={me} onOpenSignIn={() => setSignInOpen(true)} onSignOut={signOut} />
           <button
             className="icon-btn"
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
@@ -465,6 +512,9 @@ function App() {
           onPause={startPause}
         />
       )}
+
+      {/* Sign-in modal */}
+      {signInOpen && <window.Auth.SignInModal onClose={() => setSignInOpen(false)} />}
 
       {/* Toast */}
       <div className="toast-zone">

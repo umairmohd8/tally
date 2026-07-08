@@ -20,6 +20,7 @@ const Icons = {
   Chevron: (p) => <Icon {...p} d="M9 6l6 6-6 6" />,
   Pause:   (p) => <Icon {...p} d={["M9 5v14", "M15 5v14"]} stroke={1.8} />,
   Edit:    (p) => <Icon {...p} d={["M14 4l6 6", "M3 21l3.7-.6L20 8l-4-4L4.6 16.3 3 21z"]} />,
+  Cloud:   (p) => <Icon {...p} d={["M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.3A3.5 3.5 0 0 1 18 18z"]} />,
 };
 
 window.Icons = Icons;

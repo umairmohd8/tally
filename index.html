@@ -741,6 +741,16 @@
     }
     .check.pulse { animation: none !important; }
   }
+
+  /* ============ SYNC / ACCOUNT ============ */
+  .sync-blurb { font-size: 13px; color: var(--ink-50); line-height: 1.5; margin-bottom: 12px; }
+  .sync-err { font-size: 12px; color: var(--pop); margin-top: 8px; }
+  .avatar-sm { width: 30px; height: 30px; font-size: 14px; cursor: pointer; }
+  .account-menu { position: absolute; top: 38px; right: 0; z-index: 10; background: var(--card);
+    border: 1px solid var(--smoke); border-radius: 10px; box-shadow: var(--shadow-lg); min-width: 150px; padding: 6px; }
+  .account-menu-name { font-size: 11px; color: var(--ink-30); font-family: var(--mono); padding: 4px 8px; }
+  .account-menu button { width: 100%; text-align: left; padding: 8px 8px; border-radius: 6px; font-size: 13px; color: var(--ink); }
+  .account-menu button:hover { background: var(--card-2); }
 </style>
 </head>
 <body>
@@ -751,11 +761,16 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
 <script type="text/babel" src="tweaks-panel.jsx"></script>
 <script type="text/babel" src="icons.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="screens.jsx"></script>
 <script type="text/babel" src="social.jsx"></script>
+<script type="text/babel" src="sync.jsx"></script>
+<script type="text/babel" src="auth.jsx"></script>
 <script type="text/babel" src="app.jsx"></script>
 
 </body>
