@@ -97,7 +97,10 @@ function App() {
 
   const [habits, setHabits] = useState(() => {
     const stored = lsGet(LS.HABITS, null);
-    return stored && Array.isArray(stored) && stored.length > 0 ? stored : seedHabits(new Date());
+    if (stored && Array.isArray(stored) && stored.length > 0) return stored;
+    // Backend configured → don't seed (signed-out users see the landing/demo, signed-in load
+    // from cloud). Only seed for the no-backend local-dev guest fallback.
+    return window.Sync.enabled() ? [] : seedHabits(new Date());
   });
   const [me, setMe] = useState(() => {
     const stored = lsGet(LS.ME, null);
@@ -105,7 +108,8 @@ function App() {
   });
   const [friends, setFriends] = useState(() => {
     const stored = lsGet(LS.FRIENDS, null);
-    return stored && Array.isArray(stored) && stored.length > 0 ? stored : window.Social.seedFriends(new Date());
+    if (stored && Array.isArray(stored) && stored.length > 0) return stored;
+    return window.Sync.enabled() ? [] : window.Social.seedFriends(new Date());
   });
   const [session, setSession] = useState(null);
   const [signInOpen, setSignInOpen] = useState(false);
@@ -331,6 +335,19 @@ function App() {
   // date strings
   const dateStr = today.toLocaleString('en', { month: 'long', day: 'numeric' }).toLowerCase();
   const dowStr = today.toLocaleString('en', { weekday: 'long' }).toLowerCase();
+
+  // -------- Landing (signed-out, backend configured) --------
+  // Signed-out visitors on a configured backend get the landing page (with live demo),
+  // never the tracker. All hooks above run unconditionally, so this early return is safe.
+  if (window.Sync.enabled() && !session) {
+    return (
+      <window.Landing.LandingPage
+        onSignIn={() => window.Sync.signInGoogle()}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+      />
+    );
+  }
 
   // -------- Recovery screen --------
   if (view === 'recovery') {
