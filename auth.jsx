@@ -4,7 +4,8 @@
 const { useState: useStateA } = React;
 
 function SignInModal({ onClose }) {
-  const [mode, setMode] = useStateA('choose'); // 'choose' | 'phone' | 'code'
+  const [mode, setMode] = useStateA('choose'); // 'choose' | 'email' | 'sent' | 'phone' | 'code'
+  const [email, setEmail] = useStateA('');
   const [phone, setPhone] = useStateA('');
   const [code, setCode] = useStateA('');
   const [busy, setBusy] = useStateA(false);
@@ -19,6 +20,13 @@ function SignInModal({ onClose }) {
   const google = async () => {
     setErr(''); setBusy(true);
     try { await window.Sync.signInGoogle(); } catch (e) { setErr(e.message || 'Sign-in failed'); setBusy(false); }
+  };
+  const sendLink = async () => {
+    if (!email.trim()) return;
+    setErr(''); setBusy(true);
+    try { await window.Sync.signInEmail(email.trim()); setMode('sent'); }
+    catch (e) { setErr(e.message || 'Could not send link'); }
+    setBusy(false);
   };
   const sendCode = async () => {
     if (!phone.trim()) return;
@@ -49,7 +57,20 @@ function SignInModal({ onClose }) {
           {mode === 'choose' && (
             <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button className="btn btn-primary" disabled={busy} onClick={google}>Continue with Google</button>
+              <button className="btn btn-ghost" disabled={busy} onClick={() => setMode('email')}>Continue with email</button>
               <button className="btn btn-ghost" disabled={busy} onClick={() => setMode('phone')}>Use phone number</button>
+            </div>
+          )}
+          {mode === 'email' && (
+            <div className="field">
+              <input className="text-input" type="email" placeholder="you@example.com" value={email} autoFocus inputMode="email"
+                onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendLink(); }} />
+            </div>
+          )}
+          {mode === 'sent' && (
+            <div className="field">
+              <div className="field-label">Check your inbox</div>
+              <p className="sync-blurb">We sent a sign-in link to <strong>{email}</strong>. Open it on this device to finish — you can close this.</p>
             </div>
           )}
           {mode === 'phone' && (
@@ -69,7 +90,8 @@ function SignInModal({ onClose }) {
         </div>
         <div className="modal-foot">
           <div className="modal-foot-end">
-            <button className="btn btn-ghost" onClick={onClose}>Not now</button>
+            <button className="btn btn-ghost" onClick={onClose}>{mode === 'sent' ? 'Done' : 'Not now'}</button>
+            {mode === 'email' && <button className="btn btn-primary" disabled={busy || !email.trim()} onClick={sendLink}>Send link</button>}
             {mode === 'phone' && <button className="btn btn-primary" disabled={busy || !phone.trim()} onClick={sendCode}>Send code</button>}
             {mode === 'code' && <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={verify}>Verify</button>}
           </div>

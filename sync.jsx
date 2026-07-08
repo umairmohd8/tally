@@ -57,6 +57,14 @@
       options: { redirectTo: window.location.origin + window.location.pathname },
     });
   }
+  function signInEmail(email) {
+    // Magic link: user clicks the emailed link → redirected back here → onAuthStateChange
+    // establishes the session. No code-entry step needed.
+    return sb().auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname },
+    });
+  }
   function signInPhone(phone) { return sb().auth.signInWithOtp({ phone }); }
   function verifyPhone(phone, token) { return sb().auth.verifyOtp({ phone, token, type: 'sms' }); }
   function signOut() { return sb().auth.signOut(); }
@@ -143,7 +151,7 @@
   }
 
   window.Sync = {
-    enabled, uuid, init, signInGoogle, signInPhone, verifyPhone, signOut,
+    enabled, uuid, init, signInGoogle, signInEmail, signInPhone, verifyPhone, signOut,
     loadProfile, saveProfile,
     loadHabits, insertHabit, updateHabit, softDeleteHabit, setCompletion,
     migrateLocalHabits,
