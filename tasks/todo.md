@@ -8,14 +8,14 @@ _(nothing in progress)_
 
 ## Next
 
-- [ ] **Task 0 — Supabase project setup (MANUAL, user).** See the plan
-      `docs/superpowers/plans/2026-05-29-real-backend-sync-phase1.md` §Task 0: create the
-      project, run the schema+RLS SQL, enable Google + phone auth, add localhost:8000 +
-      GitHub Pages redirect URLs. Then hand off Project URL + anon key → fill `config.js`.
-- [ ] **Live-sync verification (Task 8B)** — after Task 0 + real `config.js`: sign-in renders,
-      migration, cross-device realtime, fresh-device pull, RLS isolation, sign-out.
 - [ ] **Deploy to GitHub Pages (Task 7)** — enable Pages on `main`/root; add the Pages URL to
-      Supabase redirect URLs.
+      Supabase redirect URLs. **Blocker to solve first:** `config.js` is gitignored, so a plain
+      Pages deploy runs guest-only (no `window.sb`). Need a config-injection strategy (e.g. a
+      GitHub Actions build step that writes `config.js` from a repo secret, or accept the anon
+      key being public on the live site and commit a Pages-only config). Decide before deploying.
+- [ ] **Email auth (optional, later)** — only works with custom SMTP + code-based OTP (see
+      lessons). Google is the primary auth for now; skip email unless SMTP is set up.
+- [ ] **Phone auth (optional)** — needs Twilio (paid). Deferred.
 
 ## Done
 
@@ -30,6 +30,12 @@ _(nothing in progress)_
       session. Seeded demo data no longer migrates unless the user shaped their own list
       (`tally-touched` flag on add/edit/delete). Guest mode browser-verified (renders, no
       errors, account control hidden while `window.sb === null`).
+- [x] **Live Supabase project wired + sign-in verified end-to-end** — 2026-07-08. Real project
+      (`rnrygrfuhsnlnmqbynui`) configured in local `config.js` (gitignored; `config.example.js`
+      committed). Backend verified: client connects, schema present, RLS blocks anon reads AND
+      writes. Email magic-link auth abandoned (link-scanner + SMTP-gated templates — see lessons);
+      **Google OAuth** set up and **live sync confirmed** (Google sign-in → habits round-trip
+      through Supabase, user-verified across sessions).
 
 ## Notes / open questions
 
