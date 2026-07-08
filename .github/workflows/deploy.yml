@@ -1,0 +1,51 @@
+name: Deploy to GitHub Pages
+
+# Static, zero-build app. This workflow generates config.js from repo secrets at build
+# time (the anon key stays out of git) and publishes the app to GitHub Pages.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site (runtime files + generated config.js)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          mkdir -p dist
+          cp index.html *.jsx dist/
+          cat > dist/config.js <<EOF
+          // Generated at deploy time from GitHub Secrets. Anon key is public-by-design;
+          // Row-Level Security protects the data.
+          window.SUPABASE_URL = '${SUPABASE_URL}';
+          window.SUPABASE_ANON_KEY = '${SUPABASE_ANON_KEY}';
+          window.sb = (window.supabase && window.SUPABASE_URL.startsWith('https://YOUR-'))
+            ? null
+            : (window.supabase ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) : null);
+          EOF
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
