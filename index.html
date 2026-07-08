@@ -751,6 +751,28 @@
   .account-menu-name { font-size: 11px; color: var(--ink-30); font-family: var(--mono); padding: 4px 8px; }
   .account-menu button { width: 100%; text-align: left; padding: 8px 8px; border-radius: 6px; font-size: 13px; color: var(--ink); }
   .account-menu button:hover { background: var(--card-2); }
+
+  /* LANDING */
+  .landing { max-width: 760px; margin: 0 auto; padding: 24px 20px 64px; }
+  .landing-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 48px; }
+  .landing-word { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-size: 22px; font-style: italic; color: var(--ink); }
+  .landing-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pop); display: inline-block; }
+  .landing-top-actions { display: flex; align-items: center; gap: 10px; }
+  .landing-hero { text-align: center; padding: 32px 0 40px; }
+  .landing-h1 { font-family: var(--display); font-size: clamp(30px, 6vw, 46px); line-height: 1.1; color: var(--ink); margin: 0 0 16px; }
+  .landing-sub { font-size: 16px; line-height: 1.55; color: var(--ink-50); max-width: 520px; margin: 0 auto 24px; }
+  .btn-lg { font-size: 15px; padding: 12px 22px; }
+  .landing-demo-wrap { margin: 8px 0 48px; }
+  .landing-demo { border: 1px solid var(--smoke); border-radius: 16px; padding: 16px; background: var(--card); }
+  .landing-demo-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-30); margin-bottom: 12px; padding-left: 4px; }
+  .landing-demo-rows { display: flex; flex-direction: column; gap: 10px; }
+  .landing-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px; }
+  .landing-feat { border: 1px solid var(--smoke); border-radius: 14px; padding: 18px; background: var(--card); }
+  .landing-feat-t { font-family: var(--display); font-size: 17px; color: var(--ink); margin-bottom: 6px; }
+  .landing-feat-d { font-size: 13.5px; line-height: 1.5; color: var(--ink-50); }
+  .landing-foot { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink-30); border-top: 1px solid var(--smoke); padding-top: 16px; }
+  .landing-foot a { color: var(--ink-50); }
+  @media (max-width: 560px) { .landing-feats { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -771,6 +793,7 @@
 <script type="text/babel" src="social.jsx"></script>
 <script type="text/babel" src="sync.jsx"></script>
 <script type="text/babel" src="auth.jsx"></script>
+<script type="text/babel" src="landing.jsx"></script>
 <script type="text/babel" src="app.jsx"></script>
 
 </body>
