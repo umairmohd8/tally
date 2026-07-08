@@ -8,11 +8,12 @@ _(nothing in progress)_
 
 ## Next
 
-- [ ] **Deploy to GitHub Pages (Task 7)** — enable Pages on `main`/root; add the Pages URL to
-      Supabase redirect URLs. **Blocker to solve first:** `config.js` is gitignored, so a plain
-      Pages deploy runs guest-only (no `window.sb`). Need a config-injection strategy (e.g. a
-      GitHub Actions build step that writes `config.js` from a repo secret, or accept the anon
-      key being public on the live site and commit a Pages-only config). Decide before deploying.
+- [ ] **Supabase redirect URL for live site** — add `https://umairmohd8.github.io/tally/**` to
+      Auth → URL Configuration → Redirect URLs, and set Site URL, so Google sign-in works on the
+      deployed app (not just localhost). MANUAL (user, Supabase dashboard).
+- [ ] **Clean-start friends** — signed-in accounts still show the local demo friends seed
+      (friends aren't synced; Phase 2). Optionally gate/clear the friends seed when signed in,
+      matching the habits clean-start behavior.
 - [ ] **Email auth (optional, later)** — only works with custom SMTP + code-based OTP (see
       lessons). Google is the primary auth for now; skip email unless SMTP is set up.
 - [ ] **Phone auth (optional)** — needs Twilio (paid). Deferred.
@@ -36,6 +37,11 @@ _(nothing in progress)_
       writes. Email magic-link auth abandoned (link-scanner + SMTP-gated templates — see lessons);
       **Google OAuth** set up and **live sync confirmed** (Google sign-in → habits round-trip
       through Supabase, user-verified across sessions).
+- [x] **Deployed to GitHub Pages** — 2026-07-08. Repo made public (free-plan Pages needs public;
+      audited first — no secrets/PII in code or history). `.github/workflows/deploy.yml` generates
+      `config.js` from repo secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) at build time and
+      publishes. Live at **https://umairmohd8.github.io/tally/** — verified serving, mounting, and
+      connecting to Supabase. Auto-deploys on push to `main`.
 
 ## Notes / open questions
 
