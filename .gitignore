@@ -10,4 +10,11 @@
 *.log
 .secret-pass
 
+# Live Supabase config — real anon key/URL stay local (copy from config.example.js).
+# Anon key is public-by-design, but we keep tokens out of git per the secret-scanner policy.
+config.js
+
 .superpowers/
+
+# Added by ggshield
+.cache_ggshield
