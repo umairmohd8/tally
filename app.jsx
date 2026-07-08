@@ -22,6 +22,7 @@ const LS = {
   SEEN_WB:   'tally-seen-welcome-back',
   ME:        'tally-me',
   FRIENDS:   'tally-friends',
+  TOUCHED:   'tally-touched', // user shaped their own habit list (add/edit/delete) — gates seed migration
 };
 function lsGet(k, fallback) {
   try {
@@ -163,7 +164,10 @@ function App() {
       if (!s) return;
       setSignInOpen(false); // phone-OTP path: close the sign-in modal once authenticated
       try {
-        const uploaded = await window.Sync.migrateLocalHabits(lsGet(LS.HABITS, []));
+        // Only migrate local habits the user actually shaped (add/edit/delete). An
+        // untouched demo seed must NOT become their authoritative account → clean start.
+        const touched = lsGet(LS.TOUCHED, false);
+        const uploaded = await window.Sync.migrateLocalHabits(touched ? lsGet(LS.HABITS, []) : []);
         const [cloudHabits, cloudMe] = await Promise.all([window.Sync.loadHabits(), window.Sync.loadProfile()]);
         setHabits(cloudHabits);
         if (cloudMe) setMe(cloudMe);
@@ -228,6 +232,7 @@ function App() {
       ...data, completions: {}, createdAt: dayKey(new Date()),
     };
     setHabits(prev => [...prev, habit]);
+    lsSet(LS.TOUCHED, true);
     setModalOpen(false); setModalDefaultTOD(null);
     if (signedInRef.current) window.Sync.insertHabit(habit).catch(() => {});
     setTimeout(() => showToast(`Added · ${data.name}`), 100);
@@ -236,6 +241,7 @@ function App() {
   const editHabit = useCallback((id, data) => {
     let merged = null;
     setHabits(prev => prev.map(h => { if (h.id !== id) return h; merged = { ...h, ...data }; return merged; }));
+    lsSet(LS.TOUCHED, true);
     setEditingHabit(null);
     if (signedInRef.current && merged) window.Sync.updateHabit(merged).catch(() => {});
     setTimeout(() => showToast(`Updated · ${data.name}`), 100);
@@ -243,6 +249,7 @@ function App() {
 
   const deleteHabit = useCallback((id) => {
     setHabits(prev => prev.filter(h => h.id !== id));
+    lsSet(LS.TOUCHED, true);
     if (signedInRef.current) window.Sync.softDeleteHabit(id).catch(() => {});
   }, []);
 
