@@ -201,7 +201,7 @@ function FriendsScreen({ me, friends, today, signedIn, myCode, onAddByCode, onAd
   const saveName = () => { onRenameMe(nameDraft); setEditingName(false); };
   const copyCode = () => {
     if (!myCode) return;
-    try { navigator.clipboard.writeText(myCode); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch (_) {}
+    try { navigator.clipboard.writeText(myCode).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch (_) {}
   };
   return (
     <div className="friends-screen">

@@ -173,8 +173,9 @@ function App() {
         // untouched demo seed must NOT become their authoritative account → clean start.
         const touched = lsGet(LS.TOUCHED, false);
         const uploaded = await window.Sync.migrateLocalHabits(touched ? lsGet(LS.HABITS, []) : []);
-        const [cloudHabits, cloudMe, cloudFriends, code] = await Promise.all([
-          window.Sync.loadHabits(), window.Sync.loadProfile(), window.Sync.loadFriends(), window.Sync.myInviteCode(),
+        const cloudMe = await window.Sync.loadProfile();
+        const [cloudHabits, cloudFriends, code] = await Promise.all([
+          window.Sync.loadHabits(), window.Sync.loadFriends(), window.Sync.myInviteCode(),
         ]);
         setHabits(cloudHabits);
         if (cloudMe) setMe(cloudMe);
@@ -188,6 +189,13 @@ function App() {
     });
     return () => { sub.unsubscribe(); unsubRealtime(); };
   }, [showToast]);
+
+  // Refresh friends whenever the Friends tab is opened (signed-in only).
+  useEffect(() => {
+    if (tab === 'friends' && signedInRef.current) {
+      window.Sync.loadFriends().then(setFriends).catch(() => {});
+    }
+  }, [tab]);
 
   // ---- toggle (hero interaction) ----
   const toggle = useCallback((id, dKeyOverride) => {
@@ -278,8 +286,8 @@ function App() {
   }, [showToast]);
   const addFriendByCode = useCallback(async (code) => {
     const friend = await window.Sync.addFriendByCode(code);   // throws → AddByCode shows the message
-    setFriends(await window.Sync.loadFriends());
     if (friend) showToast(`Added · ${friend.name}`);
+    try { setFriends(await window.Sync.loadFriends()); } catch (_) {}
   }, [showToast]);
   const removeFriend = useCallback((id) => {
     setFriends(prev => prev.filter(f => f.id !== id));
