@@ -62,8 +62,8 @@ function seedHabits(today) {
   for (let i = 1; i < 8; i++) read.completions[dayKey(addDays(today, -i))] = true;
   const lang = mk('h6', 'Spanish · Duolingo', 'pop', { type: 'weekly_count', count: 5 }, 'evening', null, sparse);
 
-  read.shared = true;
-  run.shared = true;
+  read.shareMode = 'all';
+  run.shareMode = 'all';
 
   return [water, pages, run, stretch, read, lang];
 }
@@ -111,6 +111,7 @@ function App() {
     if (stored && Array.isArray(stored) && stored.length > 0) return stored;
     return window.Sync.enabled() ? [] : window.Social.seedFriends(new Date());
   });
+  const [myCode, setMyCode] = useState(null);
   const [session, setSession] = useState(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const signedInRef = useRef(false);
@@ -165,16 +166,20 @@ function App() {
       if (userId === lastUserRef.current) return;
       lastUserRef.current = userId;
       unsubRealtime(); unsubRealtime = () => {};
-      if (!s) return;
+      if (!s) { setFriends([]); setMyCode(null); return; }
       setSignInOpen(false); // phone-OTP path: close the sign-in modal once authenticated
       try {
         // Only migrate local habits the user actually shaped (add/edit/delete). An
         // untouched demo seed must NOT become their authoritative account → clean start.
         const touched = lsGet(LS.TOUCHED, false);
         const uploaded = await window.Sync.migrateLocalHabits(touched ? lsGet(LS.HABITS, []) : []);
-        const [cloudHabits, cloudMe] = await Promise.all([window.Sync.loadHabits(), window.Sync.loadProfile()]);
+        const [cloudHabits, cloudMe, cloudFriends, code] = await Promise.all([
+          window.Sync.loadHabits(), window.Sync.loadProfile(), window.Sync.loadFriends(), window.Sync.myInviteCode(),
+        ]);
         setHabits(cloudHabits);
         if (cloudMe) setMe(cloudMe);
+        setFriends(cloudFriends);
+        setMyCode(code);
         showToast(uploaded ? `Synced ${uploaded} habit${uploaded === 1 ? '' : 's'} to your account` : 'Synced. Welcome back.');
         unsubRealtime = window.Sync.subscribe(s.user.id, async () => {
           try { setHabits(await window.Sync.loadHabits()); } catch (_) {}
@@ -231,23 +236,33 @@ function App() {
 
   // ---- add ----
   const addHabit = useCallback((data) => {
+    const { sharedWith, ...habitData } = data;
     const habit = {
       id: window.Sync.uuid(),
-      ...data, completions: {}, createdAt: dayKey(new Date()),
+      ...habitData, completions: {}, createdAt: dayKey(new Date()),
     };
     setHabits(prev => [...prev, habit]);
     lsSet(LS.TOUCHED, true);
     setModalOpen(false); setModalDefaultTOD(null);
-    if (signedInRef.current) window.Sync.insertHabit(habit).catch(() => {});
+    if (signedInRef.current) {
+      window.Sync.insertHabit(habit)
+        .then(() => habit.shareMode === 'selected' ? window.Sync.setHabitShares(habit.id, sharedWith) : null)
+        .catch(() => {});
+    }
     setTimeout(() => showToast(`Added · ${data.name}`), 100);
   }, [showToast]);
 
   const editHabit = useCallback((id, data) => {
+    const { sharedWith, ...habitData } = data;
     let merged = null;
-    setHabits(prev => prev.map(h => { if (h.id !== id) return h; merged = { ...h, ...data }; return merged; }));
+    setHabits(prev => prev.map(h => { if (h.id !== id) return h; merged = { ...h, ...habitData }; return merged; }));
     lsSet(LS.TOUCHED, true);
     setEditingHabit(null);
-    if (signedInRef.current && merged) window.Sync.updateHabit(merged).catch(() => {});
+    if (signedInRef.current && merged) {
+      window.Sync.updateHabit(merged)
+        .then(() => window.Sync.setHabitShares(id, merged.shareMode === 'selected' ? sharedWith : []))
+        .catch(() => {});
+    }
     setTimeout(() => showToast(`Updated · ${data.name}`), 100);
   }, [showToast]);
 
@@ -261,8 +276,14 @@ function App() {
     setFriends(prev => [...prev, window.Social.makeFriend(name, color, new Date())]);
     setTimeout(() => showToast(`Added · ${name}`), 100);
   }, [showToast]);
+  const addFriendByCode = useCallback(async (code) => {
+    const friend = await window.Sync.addFriendByCode(code);   // throws → AddByCode shows the message
+    setFriends(await window.Sync.loadFriends());
+    if (friend) showToast(`Added · ${friend.name}`);
+  }, [showToast]);
   const removeFriend = useCallback((id) => {
     setFriends(prev => prev.filter(f => f.id !== id));
+    if (signedInRef.current) window.Sync.removeFriend(id).catch(() => {});
   }, []);
   const renameMe = useCallback((name) => {
     setMe(prev => {
@@ -512,6 +533,9 @@ function App() {
           me={me}
           friends={friends}
           today={today}
+          signedIn={!!session}
+          myCode={myCode}
+          onAddByCode={addFriendByCode}
           onAddFriend={addFriend}
           onRemoveFriend={removeFriend}
           onRenameMe={renameMe}
@@ -522,6 +546,8 @@ function App() {
       {(modalOpen || editingHabit) && (
         <HabitModal
           habit={editingHabit}
+          friends={friends}
+          getShares={window.Sync.enabled() ? window.Sync.loadHabitShares : null}
           onClose={() => { setModalOpen(false); setModalDefaultTOD(null); setEditingHabit(null); }}
           onSubmit={(data) => editingHabit ? editHabit(editingHabit.id, data) : addHabit(data)}
           onArchive={editingHabit ? (id) => { deleteHabit(id); setEditingHabit(null); } : null}
