@@ -23,7 +23,7 @@
     return {
       id: r.id, name: r.name, color: r.color, schedule: r.schedule,
       timeOfDay: r.time_of_day, reminderTime: r.reminder_time,
-      endDate: r.end_date, shared: r.shared, createdAt: r.created_at,
+      endDate: r.end_date, shareMode: r.share_mode || 'private', createdAt: r.created_at,
       completions: completions || {},
     };
   }
@@ -32,7 +32,7 @@
       id: h.id, user_id: userId, name: h.name, color: h.color,
       schedule: h.schedule, time_of_day: h.timeOfDay || 'whenever',
       reminder_time: h.reminderTime || null, end_date: h.endDate || null,
-      shared: !!h.shared, created_at: h.createdAt, updated_at: new Date().toISOString(),
+      share_mode: h.shareMode || 'private', created_at: h.createdAt, updated_at: new Date().toISOString(),
     };
   }
   async function uid() {
@@ -151,6 +151,64 @@
     return data == null ? 0 : Number(data);
   }
 
+  // ---- friends ----
+  async function myInviteCode() {
+    const id = await uid(); if (!id) return null;
+    const { data } = await sb().from('profiles').select('invite_code').eq('id', id).maybeSingle();
+    return data ? data.invite_code : null;
+  }
+  // Returns friend { id, name, avatarColor } or throws; error.message ∈
+  // {not_found, self, already_friends, not_authenticated}.
+  async function addFriendByCode(code) {
+    const { data, error } = await sb().rpc('add_friend_by_code', { code });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? { id: row.id, name: row.name, avatarColor: row.avatar_color } : null;
+  }
+  async function removeFriend(friendId) {
+    const me = await uid(); if (!me) return;
+    const a = me < friendId ? me : friendId;
+    const b = me < friendId ? friendId : me;
+    const { error } = await sb().from('friendships').delete().eq('user_a', a).eq('user_b', b);
+    if (error) throw error;
+  }
+  // Assembles friends into the exact shape the Friends UI renders:
+  // { id, name, avatarColor, habits: Habit[] } — RLS filters habits/completions to the visible set.
+  async function loadFriends() {
+    const me = await uid(); if (!me) return [];
+    const { data: fr, error } = await sb().from('friendships').select('user_a,user_b');
+    if (error) throw error;
+    const ids = (fr || []).map((r) => (r.user_a === me ? r.user_b : r.user_a));
+    if (!ids.length) return [];
+    const { data: profs } = await sb().from('profiles').select('id,name,avatar_color').in('id', ids);
+    const { data: habitRows } = await sb().from('habits').select('*').in('user_id', ids).is('deleted_at', null);
+    const hids = (habitRows || []).map((h) => h.id);
+    let comps = [];
+    if (hids.length) {
+      const { data } = await sb().from('habit_completions').select('*').in('habit_id', hids);
+      comps = data || [];
+    }
+    const byHabit = {};
+    comps.forEach((c) => { (byHabit[c.habit_id] = byHabit[c.habit_id] || {})[c.day] = true; });
+    const habitsByUser = {};
+    (habitRows || []).forEach((r) => {
+      (habitsByUser[r.user_id] = habitsByUser[r.user_id] || []).push(rowToHabit(r, byHabit[r.id] || {}));
+    });
+    return (profs || []).map((p) => ({
+      id: p.id, name: p.name, avatarColor: p.avatar_color, habits: habitsByUser[p.id] || [],
+    }));
+  }
+  async function loadHabitShares(habitId) {
+    const { data } = await sb().from('habit_shares').select('friend_id').eq('habit_id', habitId);
+    return (data || []).map((r) => r.friend_id);
+  }
+  async function setHabitShares(habitId, friendIds) {
+    const me = await uid(); if (!me) return;
+    await sb().from('habit_shares').delete().eq('habit_id', habitId);
+    const rows = (friendIds || []).map((fid) => ({ habit_id: habitId, friend_id: fid }));
+    if (rows.length) { const { error } = await sb().from('habit_shares').insert(rows); if (error) throw error; }
+  }
+
   // ---- realtime: fire onChange on any of the user's habit/completion changes ----
   function subscribe(userId, onChange) {
     if (!enabled()) return () => {};
@@ -166,6 +224,7 @@
     loadProfile, saveProfile,
     loadHabits, insertHabit, updateHabit, softDeleteHabit, setCompletion,
     migrateLocalHabits,
+    myInviteCode, addFriendByCode, removeFriend, loadFriends, loadHabitShares, setHabitShares,
     checkinsToday,
     subscribe,
     _rowToHabit: rowToHabit, _habitToRow: habitToRow, _uid: uid,
