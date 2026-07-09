@@ -90,22 +90,27 @@ function MVDButton({ onLog }) {
 // ============================================
 // BODY-DOUBLING COUNTER
 // ============================================
-function BodyDoubleCounter() {
-  // start with a believable rolling number; drift gently
-  const [n, setN] = React.useState(() => 120 + Math.floor(Math.random() * 80));
+// Real count of distinct users who completed a habit today (via Sync.checkinsToday).
+// Fetches on mount and whenever `refresh` changes (i.e. when you check in). No polling.
+// Renders nothing until it has a real number (backend off / not-yet-loaded / error → hidden).
+function BodyDoubleCounter({ enabled, day, refresh }) {
+  const [n, setN] = React.useState(null);
   React.useEffect(() => {
-    const t = setInterval(() => {
-      setN(prev => {
-        const delta = Math.floor(Math.random() * 9) - 4;
-        return Math.max(80, prev + delta);
-      });
-    }, 8000);
-    return () => clearInterval(t);
-  }, []);
+    if (!enabled || !window.Sync || !window.Sync.checkinsToday) { setN(null); return; }
+    let alive = true;
+    window.Sync.checkinsToday(day)
+      .then((c) => { if (alive) setN(typeof c === 'number' ? c : null); })
+      .catch(() => { if (alive) setN(null); });
+    return () => { alive = false; };
+  }, [enabled, day, refresh]);
+  if (n === null) return null;
+  const label = n === 0 ? 'be the first to check in today'
+    : n === 1 ? '1 person checked in today'
+    : `${n} people checked in today`;
   return (
     <div className="bd-counter" aria-live="off">
       <span className="pulse" />
-      <span>{n} people checking in right now</span>
+      <span>{label}</span>
     </div>
   );
 }

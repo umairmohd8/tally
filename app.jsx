@@ -490,7 +490,7 @@ function App() {
 
             {showMVD && <MVDButton onLog={logMVD} />}
 
-            {tweaks.showBodyDouble && <BodyDoubleCounter />}
+            {tweaks.showBodyDouble && <BodyDoubleCounter enabled={window.Sync.enabled()} day={todayKey} refresh={completedToday} />}
           </>
         )
       )}

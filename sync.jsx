@@ -140,6 +140,16 @@
     return rows.length;
   }
 
+  // ---- social proof: distinct users who checked in on `day` (default today) ----
+  // Reads a single aggregate int via a SECURITY DEFINER RPC — no row data leaves the DB.
+  // Returns null if not configured or the RPC isn't installed yet (caller hides the widget).
+  async function checkinsToday(day) {
+    if (!enabled()) return null;
+    const { data, error } = await sb().rpc('checkins_today', day ? { d: day } : {});
+    if (error) return null;
+    return data == null ? 0 : Number(data);
+  }
+
   // ---- realtime: fire onChange on any of the user's habit/completion changes ----
   function subscribe(userId, onChange) {
     if (!enabled()) return () => {};
@@ -155,6 +165,7 @@
     loadProfile, saveProfile,
     loadHabits, insertHabit, updateHabit, softDeleteHabit, setCompletion,
     migrateLocalHabits,
+    checkinsToday,
     subscribe,
     _rowToHabit: rowToHabit, _habitToRow: habitToRow, _uid: uid,
   };
