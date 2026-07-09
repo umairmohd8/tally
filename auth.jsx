@@ -4,9 +4,8 @@
 const { useState: useStateA } = React;
 
 function SignInModal({ onClose }) {
-  const [mode, setMode] = useStateA('choose'); // 'choose' | 'email' | 'emailcode'
+  const [mode, setMode] = useStateA('choose'); // 'choose' | 'email' | 'sent'
   const [email, setEmail] = useStateA('');
-  const [code, setCode] = useStateA('');
   const [busy, setBusy] = useStateA(false);
   const [err, setErr] = useStateA('');
 
@@ -20,18 +19,12 @@ function SignInModal({ onClose }) {
     setErr(''); setBusy(true);
     try { await window.Sync.signInGoogle(); } catch (e) { setErr(e.message || 'Sign-in failed'); setBusy(false); }
   };
-  const sendEmailCode = async () => {
+  const sendLink = async () => {
     if (!email.trim()) return;
     setErr(''); setBusy(true);
-    try { await window.Sync.signInEmail(email.trim()); setMode('emailcode'); }
-    catch (e) { setErr(e.message || 'Could not send code'); }
+    try { await window.Sync.signInEmail(email.trim()); setMode('sent'); }
+    catch (e) { setErr(e.message || 'Could not send link'); }
     setBusy(false);
-  };
-  const verifyEmailCode = async () => {
-    if (!code.trim()) return;
-    setErr(''); setBusy(true);
-    try { await window.Sync.verifyEmail(email.trim(), code.trim()); /* app.jsx onAuth closes the modal on session */ }
-    catch (e) { setErr(e.message || 'Wrong or expired code'); setBusy(false); }
   };
 
   return (
@@ -55,23 +48,21 @@ function SignInModal({ onClose }) {
           {mode === 'email' && (
             <div className="field">
               <input className="text-input" type="email" placeholder="you@example.com" value={email} autoFocus inputMode="email"
-                onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendEmailCode(); }} />
+                onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendLink(); }} />
             </div>
           )}
-          {mode === 'emailcode' && (
+          {mode === 'sent' && (
             <div className="field">
-              <div className="field-label">Enter the code sent to {email}</div>
-              <input className="text-input" placeholder="123456" value={code} autoFocus inputMode="numeric"
-                onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') verifyEmailCode(); }} />
+              <div className="field-label">Check your inbox</div>
+              <p className="sync-blurb">We emailed a sign-in link to <strong>{email}</strong>. Open it in <em>this</em> browser to finish.</p>
             </div>
           )}
           {err && <div className="sync-err">{err}</div>}
         </div>
         <div className="modal-foot">
           <div className="modal-foot-end">
-            <button className="btn btn-ghost" onClick={onClose}>Not now</button>
-            {mode === 'email' && <button className="btn btn-primary" disabled={busy || !email.trim()} onClick={sendEmailCode}>Send code</button>}
-            {mode === 'emailcode' && <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={verifyEmailCode}>Verify</button>}
+            <button className="btn btn-ghost" onClick={onClose}>{mode === 'sent' ? 'Done' : 'Not now'}</button>
+            {mode === 'email' && <button className="btn btn-primary" disabled={busy || !email.trim()} onClick={sendLink}>Send link</button>}
           </div>
         </div>
       </div>
