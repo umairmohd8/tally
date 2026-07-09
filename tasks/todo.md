@@ -11,9 +11,6 @@ _(nothing in progress)_
 - [ ] **Supabase redirect URL for live site** — add `https://umairmohd8.github.io/tally/**` to
       Auth → URL Configuration → Redirect URLs, and set Site URL, so Google sign-in works on the
       deployed app (not just localhost). MANUAL (user, Supabase dashboard).
-- [ ] **Clean-start friends** — signed-in accounts still show the local demo friends seed
-      (friends aren't synced; Phase 2). Optionally gate/clear the friends seed when signed in,
-      matching the habits clean-start behavior.
 - [ ] **Email auth (optional, later)** — only works with custom SMTP + code-based OTP (see
       lessons). Google is the primary auth for now; skip email unless SMTP is set up.
 - [ ] **Phone auth (optional)** — needs Twilio (paid). Deferred.
@@ -42,6 +39,14 @@ _(nothing in progress)_
       `config.js` from repo secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) at build time and
       publishes. Live at **https://umairmohd8.github.io/tally/** — verified serving, mounting, and
       connecting to Supabase. Auto-deploys on push to `main`.
+
+- [x] **Landing + login page with live demo** — 2026-07-09. New `landing.jsx`
+      (`window.Landing.LandingPage`): hero + 4 feature cards + a live **ephemeral** demo (reuses
+      `HabitRow`, local state only, resets on reload). `app.jsx` renders it when
+      `Sync.enabled() && !session`; seed initializers (habits + friends) no longer seed when a
+      backend is configured — fixes the incognito stale-data leak (also resolves the "new account
+      shows demo friends" item). Google-only sign-in. Verified local + **live** (fresh visitor →
+      landing, `tally-habits` = `[]`, demo ephemeral). Spec + plan in `docs/superpowers/`.
 
 ## Notes / open questions
 
