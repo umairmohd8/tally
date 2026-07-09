@@ -65,6 +65,7 @@
       options: { emailRedirectTo: window.location.origin + window.location.pathname },
     });
   }
+  function verifyEmail(email, token) { return sb().auth.verifyOtp({ email, token, type: 'email' }); }
   function signInPhone(phone) { return sb().auth.signInWithOtp({ phone }); }
   function verifyPhone(phone, token) { return sb().auth.verifyOtp({ phone, token, type: 'sms' }); }
   function signOut() { return sb().auth.signOut(); }
@@ -161,7 +162,7 @@
   }
 
   window.Sync = {
-    enabled, uuid, init, signInGoogle, signInEmail, signInPhone, verifyPhone, signOut,
+    enabled, uuid, init, signInGoogle, signInEmail, verifyEmail, signInPhone, verifyPhone, signOut,
     loadProfile, saveProfile,
     loadHabits, insertHabit, updateHabit, softDeleteHabit, setCompletion,
     migrateLocalHabits,

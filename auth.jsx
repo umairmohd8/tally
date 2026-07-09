@@ -4,9 +4,8 @@
 const { useState: useStateA } = React;
 
 function SignInModal({ onClose }) {
-  const [mode, setMode] = useStateA('choose'); // 'choose' | 'email' | 'sent' | 'phone' | 'code'
+  const [mode, setMode] = useStateA('choose'); // 'choose' | 'email' | 'emailcode'
   const [email, setEmail] = useStateA('');
-  const [phone, setPhone] = useStateA('');
   const [code, setCode] = useStateA('');
   const [busy, setBusy] = useStateA(false);
   const [err, setErr] = useStateA('');
@@ -21,25 +20,18 @@ function SignInModal({ onClose }) {
     setErr(''); setBusy(true);
     try { await window.Sync.signInGoogle(); } catch (e) { setErr(e.message || 'Sign-in failed'); setBusy(false); }
   };
-  const sendLink = async () => {
+  const sendEmailCode = async () => {
     if (!email.trim()) return;
     setErr(''); setBusy(true);
-    try { await window.Sync.signInEmail(email.trim()); setMode('sent'); }
-    catch (e) { setErr(e.message || 'Could not send link'); }
-    setBusy(false);
-  };
-  const sendCode = async () => {
-    if (!phone.trim()) return;
-    setErr(''); setBusy(true);
-    try { await window.Sync.signInPhone(phone.trim()); setMode('code'); }
+    try { await window.Sync.signInEmail(email.trim()); setMode('emailcode'); }
     catch (e) { setErr(e.message || 'Could not send code'); }
     setBusy(false);
   };
-  const verify = async () => {
+  const verifyEmailCode = async () => {
     if (!code.trim()) return;
     setErr(''); setBusy(true);
-    try { await window.Sync.verifyPhone(phone.trim(), code.trim()); /* app.jsx onAuth closes the modal on session */ }
-    catch (e) { setErr(e.message || 'Wrong code'); setBusy(false); }
+    try { await window.Sync.verifyEmail(email.trim(), code.trim()); /* app.jsx onAuth closes the modal on session */ }
+    catch (e) { setErr(e.message || 'Wrong or expired code'); setBusy(false); }
   };
 
   return (
@@ -58,42 +50,28 @@ function SignInModal({ onClose }) {
             <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button className="btn btn-primary" disabled={busy} onClick={google}>Continue with Google</button>
               <button className="btn btn-ghost" disabled={busy} onClick={() => setMode('email')}>Continue with email</button>
-              <button className="btn btn-ghost" disabled={busy} onClick={() => setMode('phone')}>Use phone number</button>
             </div>
           )}
           {mode === 'email' && (
             <div className="field">
               <input className="text-input" type="email" placeholder="you@example.com" value={email} autoFocus inputMode="email"
-                onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendLink(); }} />
+                onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendEmailCode(); }} />
             </div>
           )}
-          {mode === 'sent' && (
+          {mode === 'emailcode' && (
             <div className="field">
-              <div className="field-label">Check your inbox</div>
-              <p className="sync-blurb">We sent a sign-in link to <strong>{email}</strong>. Open it on this device to finish — you can close this.</p>
-            </div>
-          )}
-          {mode === 'phone' && (
-            <div className="field">
-              <input className="text-input" placeholder="+1 555 123 4567" value={phone} autoFocus
-                onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendCode(); }} />
-            </div>
-          )}
-          {mode === 'code' && (
-            <div className="field">
-              <div className="field-label">Code sent to {phone}</div>
+              <div className="field-label">Enter the code sent to {email}</div>
               <input className="text-input" placeholder="123456" value={code} autoFocus inputMode="numeric"
-                onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') verify(); }} />
+                onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') verifyEmailCode(); }} />
             </div>
           )}
           {err && <div className="sync-err">{err}</div>}
         </div>
         <div className="modal-foot">
           <div className="modal-foot-end">
-            <button className="btn btn-ghost" onClick={onClose}>{mode === 'sent' ? 'Done' : 'Not now'}</button>
-            {mode === 'email' && <button className="btn btn-primary" disabled={busy || !email.trim()} onClick={sendLink}>Send link</button>}
-            {mode === 'phone' && <button className="btn btn-primary" disabled={busy || !phone.trim()} onClick={sendCode}>Send code</button>}
-            {mode === 'code' && <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={verify}>Verify</button>}
+            <button className="btn btn-ghost" onClick={onClose}>Not now</button>
+            {mode === 'email' && <button className="btn btn-primary" disabled={busy || !email.trim()} onClick={sendEmailCode}>Send code</button>}
+            {mode === 'emailcode' && <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={verifyEmailCode}>Verify</button>}
           </div>
         </div>
       </div>

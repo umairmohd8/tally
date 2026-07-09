@@ -49,6 +49,7 @@ function DemoBoard() {
 
 function LandingPage({ onSignIn, theme, onToggleTheme }) {
   const [err, setErr] = useStateL('');
+  const [signInOpen, setSignInOpen] = useStateL(false);
   const signIn = async () => {
     setErr('');
     try { await onSignIn(); } catch (e) { setErr((e && e.message) || 'Sign-in failed'); }
@@ -76,6 +77,7 @@ function LandingPage({ onSignIn, theme, onToggleTheme }) {
         <h1 className="landing-h1">the habit tracker that's kind on the hard days.</h1>
         <p className="landing-sub">streaks, gentle recovery, and a minimum-viable-day so showing up always counts. free, and yours across devices.</p>
         <button className="btn btn-primary btn-lg" onClick={signIn}>Continue with Google</button>
+        <button className="landing-email-link" onClick={() => setSignInOpen(true)}>or continue with email</button>
         {err && <div className="sync-err">{err}</div>}
       </section>
 
@@ -96,6 +98,8 @@ function LandingPage({ onSignIn, theme, onToggleTheme }) {
         <span>tally · a warm little habit tracker</span>
         <a href="https://github.com/umairmohd8/tally" target="_blank" rel="noreferrer">source</a>
       </footer>
+
+      {signInOpen && <window.Auth.SignInModal onClose={() => setSignInOpen(false)} />}
     </div>
   );
 }
