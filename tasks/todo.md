@@ -11,9 +11,13 @@ _(nothing in progress)_
 - [ ] **Supabase redirect URL for live site** — add `https://umairmohd8.github.io/tally/**` to
       Auth → URL Configuration → Redirect URLs, and set Site URL, so Google sign-in works on the
       deployed app (not just localhost). MANUAL (user, Supabase dashboard).
-- [ ] **Email auth (optional, later)** — only works with custom SMTP + code-based OTP (see
-      lessons). Google is the primary auth for now; skip email unless SMTP is set up.
-- [ ] **Phone auth (optional)** — needs Twilio (paid). Deferred.
+- [ ] **Real check-in counter — run the SQL** — the "N checked in today" counter is live in code
+      but stays hidden until the `checkins_today()` SECURITY DEFINER function exists. Run the
+      snippet (in chat / plan) in the Supabase SQL editor to switch it on. MANUAL (user).
+- [ ] **Email code + custom SMTP (optional)** — magic link works today (no SMTP). Only needed if
+      you want a 6-digit code instead of a link (e.g. for scanned mailboxes) or higher send
+      limits: set up Resend SMTP + `{{ .Token }}` template, then re-enable the code flow
+      (`Sync.verifyEmail` is already in place). Phone/Twilio still deferred (paid).
 
 ## Done
 
@@ -47,6 +51,13 @@ _(nothing in progress)_
       backend is configured — fixes the incognito stale-data leak (also resolves the "new account
       shows demo friends" item). Google-only sign-in. Verified local + **live** (fresh visitor →
       landing, `tally-habits` = `[]`, demo ephemeral). Spec + plan in `docs/superpowers/`.
+
+- [x] **Auth working on the live site** — 2026-07-08/09. Google **and** email magic-link sign-in
+      both work end-to-end on https://umairmohd8.github.io/tally/ (Supabase Site URL + redirect
+      allow-list configured). Landing offers Google + "continue with email"; phone removed.
+- [x] **Fabricated "people checking in" replaced** — real `checkinsToday` counter (distinct users
+      with a completion today via SECURITY DEFINER RPC); hides until the SQL function is installed.
+- [x] **Modal footer fix** — tall add-habit modal now caps to viewport, body scrolls, footer pinned.
 
 ## Notes / open questions
 
