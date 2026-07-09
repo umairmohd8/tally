@@ -157,14 +157,52 @@ function AddFriendModal({ onClose, onAdd }) {
   );
 }
 
+// ---- add a friend by invite code (signed-in) ----
+function AddByCode({ onAddByCode }) {
+  const [code, setCode] = useStateS('');
+  const [err, setErr] = useStateS('');
+  const [busy, setBusy] = useStateS(false);
+  const ERRORS = {
+    not_found: "no one has that code",
+    self: "that's your own code",
+    already_friends: "you're already friends",
+  };
+  const submit = async () => {
+    const c = code.trim().toUpperCase();
+    if (!c || busy) return;
+    setBusy(true); setErr('');
+    try {
+      await onAddByCode(c);
+      setCode('');
+    } catch (e) {
+      const key = (e && e.message ? e.message : '').trim();
+      setErr(ERRORS[key] || 'could not add · check the code');
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="add-by-code">
+      <input className="text-input" placeholder="enter a friend's code" value={code} maxLength={8}
+        onChange={(e) => { setErr(''); setCode(e.target.value.toUpperCase()); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
+      <button className="btn btn-primary" disabled={!code.trim() || busy} onClick={submit}>add</button>
+      {err && <div className="add-by-code-err">{err}</div>}
+    </div>
+  );
+}
+
 // ---- the Friends tab body ----
-function FriendsScreen({ me, friends, today, onAddFriend, onRemoveFriend, onRenameMe }) {
+function FriendsScreen({ me, friends, today, signedIn, myCode, onAddByCode, onAddFriend, onRemoveFriend, onRenameMe }) {
   const { colorOf } = window.HabitUtils;
   const [adding, setAdding] = useStateS(false);
   const [editingName, setEditingName] = useStateS(false);
   const [nameDraft, setNameDraft] = useStateS(me.name);
+  const [copied, setCopied] = useStateS(false);
   React.useEffect(() => { setNameDraft(me.name); }, [me.name]);
   const saveName = () => { onRenameMe(nameDraft); setEditingName(false); };
+  const copyCode = () => {
+    if (!myCode) return;
+    try { navigator.clipboard.writeText(myCode); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch (_) {}
+  };
   return (
     <div className="friends-screen">
       <div className="friends-me">
@@ -181,20 +219,35 @@ function FriendsScreen({ me, friends, today, onAddFriend, onRemoveFriend, onRena
         )}
       </div>
 
+      {signedIn && myCode && (
+        <div className="invite-panel">
+          <div className="invite-label">your code · share it to connect</div>
+          <button className="invite-code" onClick={copyCode} title="copy">
+            {myCode}<span className="invite-copy">{copied ? 'copied' : 'copy'}</span>
+          </button>
+          <AddByCode onAddByCode={onAddByCode} />
+        </div>
+      )}
+
       {friends.length === 0 ? (
         <div className="empty">
           <div className="empty-title">Better together.</div>
-          <div className="empty-sub">Add a friend, share a habit or two, keep each other honest.</div>
-          <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a friend</button>
+          <div className="empty-sub">
+            {signedIn ? 'share your code, add a friend, keep each other honest.'
+                      : 'Add a friend, share a habit or two, keep each other honest.'}
+          </div>
+          {!signedIn && <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a friend</button>}
         </div>
       ) : (
         <>
           {friends.map((f) => <FriendCard key={f.id} friend={f} today={today} onRemove={onRemoveFriend} />)}
-          <div className="add-row">
-            <button className="add-btn" onClick={() => setAdding(true)}>
-              <window.Icons.Plus size={13} /> add friend
-            </button>
-          </div>
+          {!signedIn && (
+            <div className="add-row">
+              <button className="add-btn" onClick={() => setAdding(true)}>
+                <window.Icons.Plus size={13} /> add friend
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -203,4 +256,4 @@ function FriendsScreen({ me, friends, today, onAddFriend, onRemoveFriend, onRena
   );
 }
 
-window.Social = { FriendsScreen, FriendCard, FriendHabitRow, AddFriendModal, seedMe, seedFriends, makeFriend };
+window.Social = { FriendsScreen, FriendCard, FriendHabitRow, AddFriendModal, AddByCode, seedMe, seedFriends, makeFriend };
