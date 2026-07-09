@@ -237,6 +237,17 @@
   .friends-me-name { font-family: var(--mono); font-size: 12px; color: var(--ink-50); padding: 4px 0; }
   .friends-me-name:hover { color: var(--ink); }
   .friends-me-input { max-width: 200px; padding: 6px 10px; }
+  .invite-panel { background: var(--card); border: 1px solid var(--smoke); border-radius: 14px; padding: 12px 13px; display: flex; flex-direction: column; gap: 8px; }
+  .invite-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-30); }
+  .invite-code { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 18px; letter-spacing: 0.14em; color: var(--ink); }
+  .invite-copy { font-size: 10px; letter-spacing: 0.04em; color: var(--ink-30); border: 1px solid var(--smoke); border-radius: 6px; padding: 2px 6px; }
+  .invite-code:hover .invite-copy { color: var(--ink); border-color: var(--ink-30); }
+  .add-by-code { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .add-by-code .text-input { flex: 1; min-width: 140px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; }
+  .add-by-code-err { flex-basis: 100%; font-size: 11px; color: var(--pop); font-family: var(--mono); }
+  .share-picker { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-left: 2px; }
+  .share-friend { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .share-empty { font-family: var(--mono); font-size: 11px; color: var(--ink-30); margin-top: 8px; }
   .avatar { width: 30px; height: 30px; border-radius: 999px; flex: none; display: grid; place-items: center;
             color: #fff; font-weight: 600; font-size: 14px; }
   .friend-card { background: var(--card); border: 1px solid var(--smoke); border-radius: 14px; padding: 12px 13px; }
