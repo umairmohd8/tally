@@ -283,7 +283,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
           {ended && (
             <span className="meta-pill finished">{endedDays > 0 ? `done · ${endedDays} day${endedDays === 1 ? '' : 's'}` : 'finished'}</span>
           )}
-          {habit.shared && (
+          {habit.shareMode && habit.shareMode !== 'private' && (
             <span className="meta-pill shared" title="Friends can see this habit">shared</span>
           )}
           {!scheduledToday && !isWeekly && !ended && (
@@ -370,7 +370,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
 // ============================================
 // HABIT MODAL · add + edit · time-of-day instead of section
 // ============================================
-function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
+function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, friends = [], getShares }) {
   const { dayKey, addDays, dayCountBetween } = window.HabitUtils;
   const isEdit = !!habit;
   const sc0 = (habit && habit.schedule) || { type: 'daily' };
@@ -383,7 +383,13 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
   const [specificDays, setSpecificDays] = React.useState(sc0.type === 'specific_days' ? (sc0.days || [1, 3, 5]) : [1, 3, 5]);
   const [reminderTime, setReminderTime] = React.useState(habit && habit.reminderTime ? habit.reminderTime : '');
   const [endDate, setEndDate] = React.useState(habit && habit.endDate ? habit.endDate : null);
-  const [shared, setShared] = React.useState(habit ? !!habit.shared : false);
+  const [shareMode, setShareMode] = React.useState(habit ? (habit.shareMode || 'private') : 'private');
+  const [sharedWith, setSharedWith] = React.useState([]);
+  React.useEffect(() => {
+    if (habit && (habit.shareMode || 'private') === 'selected' && getShares) {
+      getShares(habit.id).then((ids) => setSharedWith(ids || [])).catch(() => {});
+    }
+  }, []);
   const inputRef = React.useRef(null);
   const timeRef = React.useRef(null);
 
@@ -438,7 +444,8 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
       schedule: buildSchedule(),
       reminderTime: reminderTime || null,
       endDate: endDate || null,
-      shared,
+      shareMode,
+      sharedWith,
     });
   };
 
@@ -585,11 +592,25 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay }) {
           </div>
 
           <div className="field">
-            <div className="field-label">Sharing <span className="opt">· friends can see this one</span></div>
+            <div className="field-label">Sharing <span className="opt">· who can see this one</span></div>
             <div className="chip-row" role="radiogroup" aria-label="Sharing">
-              <button className="chip" role="radio" aria-checked={!shared} onClick={() => setShared(false)}>Private</button>
-              <button className="chip" role="radio" aria-checked={shared} onClick={() => setShared(true)}>Shared with friends</button>
+              <button className="chip" role="radio" aria-checked={shareMode === 'private'} onClick={() => setShareMode('private')}>Private</button>
+              <button className="chip" role="radio" aria-checked={shareMode === 'all'} onClick={() => setShareMode('all')}>All friends</button>
+              <button className="chip" role="radio" aria-checked={shareMode === 'selected'} onClick={() => setShareMode('selected')}>Choose friends</button>
             </div>
+            {shareMode === 'selected' && (
+              <div className="share-picker">
+                {friends.length === 0 ? (
+                  <div className="share-empty">add a friend first · nobody to pick yet</div>
+                ) : friends.map((f) => (
+                  <label key={f.id} className="share-friend">
+                    <input type="checkbox" checked={sharedWith.includes(f.id)}
+                      onChange={(e) => setSharedWith((prev) => e.target.checked ? [...prev, f.id] : prev.filter((x) => x !== f.id))} />
+                    <span>{f.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="field">
