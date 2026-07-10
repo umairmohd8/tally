@@ -20,6 +20,25 @@ value from current state *before* calling setState (put the fresh state in the `
 then pass it to both the updater and any side-effect. Also: don't `.catch(() => {})` sync writes —
 swallowing errors hides data loss; at minimum surface a toast.
 
+## Unchecking a habit silently failed: recursive RLS between habits and habit_shares (bug)
+**What happened:** After the completion-sync fix, checking a habit persisted but *unchecking*
+didn't — the check reappeared on the realtime reload. Root cause: the `real_friends` RLS
+migration created a policy cycle — `habits.habits_friend_read` subqueries `habit_shares`, and
+`habit_shares_owner_all` subqueries `habits` — so evaluating either table's RLS looped
+(`42P17: infinite recursion detected in policy for relation "habits"`). Because the
+`habit_completions` "own completions" policy also subqueries `habits`, completion **DELETEs**
+hit the recursion and threw; the client's `.catch(() => {})` swallowed it, so the DB row stayed
+and the reload restored the check. (INSERT/UPSERT dodged the recursive plan, which is why
+*checking* worked but *unchecking* didn't — a confusing asymmetry.) Fixed with a `SECURITY
+DEFINER` `owns_habit()` helper (same pattern `are_friends()` already used) so the `habit_shares`
+policy checks ownership without re-entering habits RLS. Proven via a rolled-back transaction
+before applying to prod. Migration: `real-friends` worktree `20260710130000_fix_rls_recursion.sql`.
+**Rule going forward:** RLS policies that cross-reference each other's tables via inline
+`EXISTS(select from other_table ...)` recurse — table A's policy hits table B's policy hits
+table A's. Break the cycle with a `SECURITY DEFINER` function (bypasses RLS on the inner lookup).
+When a write mysteriously no-ops, test the exact SQL under the caller's role/JWT via a rolled-back
+transaction — it surfaces RLS errors the fire-and-forget client hides. Don't `.catch(() => {})`.
+
 ## Magic-link "otp_expired" was a cross-browser PKCE mismatch, NOT a scanner (corrected)
 **What happened:** Email magic links kept returning `otp_expired`. I diagnosed a "mail/link
 scanner eating single-use links" and pushed toward code-based OTP + custom SMTP (Resend). **That
