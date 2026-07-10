@@ -3,6 +3,55 @@
 Patterns learned from corrections, so the same mistake isn't repeated. One entry per lesson:
 what happened → the rule going forward.
 
+## Completions never synced: reading a value assigned inside a setState updater (bug)
+**What happened:** Habit check-ins showed locally but vanished on refresh, and the DB had zero
+`habit_completions`. Root cause: `toggle` assigned `becameDone` *inside* the `setHabits(prev => …)`
+updater, then read it on the next line to gate the cloud write (`if (becameDone !== null) Sync.setCompletion(…)`).
+React only runs a setState updater **synchronously** via its eager-bailout optimization, which is
+**skipped whenever the fiber already has a pending update** (a realtime reload, a queued toast, a
+prior setState). In that case the updater is deferred, `becameDone` stays `null`, and the write is
+silently skipped — worsened by `.catch(() => {})` hiding every failure. `addHabit` never had the
+bug because it built a plain `const` outside the updater. `editHabit` had the same latent bug.
+Confirmed with a React 18.3.1 repro: no pending update → updater runs inline (write fires); a
+pending `setState` first → updater deferred (`becameDone` null, write skipped).
+**Rule going forward:** NEVER read a variable assigned inside a `setState`/`useReducer` updater on
+a later synchronous line — updaters must be pure and their timing isn't guaranteed. Compute the
+value from current state *before* calling setState (put the fresh state in the `useCallback` deps),
+then pass it to both the updater and any side-effect. Also: don't `.catch(() => {})` sync writes —
+swallowing errors hides data loss; at minimum surface a toast.
+
+## Unchecking a habit silently failed: recursive RLS between habits and habit_shares (bug)
+**What happened:** After the completion-sync fix, checking a habit persisted but *unchecking*
+didn't — the check reappeared on the realtime reload. Root cause: the `real_friends` RLS
+migration created a policy cycle — `habits.habits_friend_read` subqueries `habit_shares`, and
+`habit_shares_owner_all` subqueries `habits` — so evaluating either table's RLS looped
+(`42P17: infinite recursion detected in policy for relation "habits"`). Because the
+`habit_completions` "own completions" policy also subqueries `habits`, completion **DELETEs**
+hit the recursion and threw; the client's `.catch(() => {})` swallowed it, so the DB row stayed
+and the reload restored the check. (INSERT/UPSERT dodged the recursive plan, which is why
+*checking* worked but *unchecking* didn't — a confusing asymmetry.) Fixed with a `SECURITY
+DEFINER` `owns_habit()` helper (same pattern `are_friends()` already used) so the `habit_shares`
+policy checks ownership without re-entering habits RLS. Proven via a rolled-back transaction
+before applying to prod. Migration: `real-friends` worktree `20260710130000_fix_rls_recursion.sql`.
+**Rule going forward:** RLS policies that cross-reference each other's tables via inline
+`EXISTS(select from other_table ...)` recurse — table A's policy hits table B's policy hits
+table A's. Break the cycle with a `SECURITY DEFINER` function (bypasses RLS on the inner lookup).
+When a write mysteriously no-ops, test the exact SQL under the caller's role/JWT via a rolled-back
+transaction — it surfaces RLS errors the fire-and-forget client hides. Don't `.catch(() => {})`.
+
+## Duplicated every habit: migration treated a failed existence-check as "empty account" (bug)
+**What happened:** All 7 habits doubled to 14 (batch insert, identical `updated_at`). Cause:
+`migrateLocalHabits` guards re-upload with `const { data: existing } = await …select('id')…` —
+it **discarded the error**. When that query errored (the live RLS recursion, before it was fixed),
+`existing` came back null, the `if (existing && existing.length) return null` guard didn't fire,
+and migration re-uploaded the local habit list on top of the existing cloud rows. Fixed by
+destructuring `error` and `throw`ing on it (abort migration on uncertainty). Cleaned up the 7
+dupe rows via soft-delete (they had zero completions; originals kept their history).
+**Rule going forward:** A guard that decides "is it safe to write?" must distinguish *"checked,
+and the answer is no"* from *"the check failed."* Never treat a swallowed/failed read as the
+permissive branch — especially before an insert/migration. Destructure Supabase `error` and act
+on it; `const { data } = …` that drops `error` is a latent bug when the query can fail.
+
 ## Magic-link "otp_expired" was a cross-browser PKCE mismatch, NOT a scanner (corrected)
 **What happened:** Email magic links kept returning `otp_expired`. I diagnosed a "mail/link
 scanner eating single-use links" and pushed toward code-based OTP + custom SMTP (Resend). **That

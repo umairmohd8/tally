@@ -128,7 +128,11 @@
   // Uploads local habits ONLY if the account has none. Returns count uploaded, or null if account already had data.
   async function migrateLocalHabits(localHabits) {
     const id = await uid(); if (!id) return null;
-    const { data: existing } = await sb().from('habits').select('id').is('deleted_at', null).limit(1);
+    // Fail safe: a FAILED existence check must NOT be read as "account is empty" —
+    // doing so re-uploads local habits on top of existing ones (duplicates). Abort
+    // instead. (A live RLS-recursion error here once duplicated every habit.)
+    const { data: existing, error: exErr } = await sb().from('habits').select('id').is('deleted_at', null).limit(1);
+    if (exErr) throw exErr;
     if (existing && existing.length) return null; // account authoritative
     const rows = [], comps = [];
     (localHabits || []).forEach((h) => {
