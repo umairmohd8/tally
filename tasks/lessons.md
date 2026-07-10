@@ -39,6 +39,19 @@ table A's. Break the cycle with a `SECURITY DEFINER` function (bypasses RLS on t
 When a write mysteriously no-ops, test the exact SQL under the caller's role/JWT via a rolled-back
 transaction — it surfaces RLS errors the fire-and-forget client hides. Don't `.catch(() => {})`.
 
+## Duplicated every habit: migration treated a failed existence-check as "empty account" (bug)
+**What happened:** All 7 habits doubled to 14 (batch insert, identical `updated_at`). Cause:
+`migrateLocalHabits` guards re-upload with `const { data: existing } = await …select('id')…` —
+it **discarded the error**. When that query errored (the live RLS recursion, before it was fixed),
+`existing` came back null, the `if (existing && existing.length) return null` guard didn't fire,
+and migration re-uploaded the local habit list on top of the existing cloud rows. Fixed by
+destructuring `error` and `throw`ing on it (abort migration on uncertainty). Cleaned up the 7
+dupe rows via soft-delete (they had zero completions; originals kept their history).
+**Rule going forward:** A guard that decides "is it safe to write?" must distinguish *"checked,
+and the answer is no"* from *"the check failed."* Never treat a swallowed/failed read as the
+permissive branch — especially before an insert/migration. Destructure Supabase `error` and act
+on it; `const { data } = …` that drops `error` is a latent bug when the query can fail.
+
 ## Magic-link "otp_expired" was a cross-browser PKCE mismatch, NOT a scanner (corrected)
 **What happened:** Email magic links kept returning `otp_expired`. I diagnosed a "mail/link
 scanner eating single-use links" and pushed toward code-based OTP + custom SMTP (Resend). **That
