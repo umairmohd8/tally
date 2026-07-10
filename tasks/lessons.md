@@ -3,6 +3,25 @@
 Patterns learned from corrections, so the same mistake isn't repeated. One entry per lesson:
 what happened → the rule going forward.
 
+## Selected-shared habits were invisible to the friends they were shared with (bug)
+**What happened:** After shipping real friends, a habit shared to a specific friend (`share_mode
+= 'selected'`) never appeared for that friend — the friend card showed but with no habits.
+Root cause: `habits_friend_read` (and `hc_friend_read`) checked the allow-list with an inline
+`EXISTS (select 1 from habit_shares where habit_id = … and friend_id = auth.uid())`, but
+`habit_shares` has **owner-only** RLS. So when the *friend* (not the owner) evaluated the policy,
+that subquery — subject to `habit_shares` RLS — saw zero rows: a friend has no read access to the
+allow-list entry naming them. The habit (and its completions) stayed hidden. The `'all'` path was
+fine; only `'selected'` broke. Related to but distinct from the earlier `habits<->habit_shares`
+recursion lesson: the recursion fix made `habit_shares_owner_all` use `owns_habit()` (stopping the
+42P17 loop) but did NOT grant friends visibility of their own allow-list rows. Proven with a
+read-only rolled-back RLS simulation (friend saw 0 habits before, `Fin/Min` after).
+**Rule going forward:** An RLS policy that does `EXISTS(select from other_table …)` only sees rows
+the *current role* is allowed to read under `other_table`'s own RLS. If the check needs to see rows
+the caller doesn't own (a friend checking an owner-managed allow-list), wrap it in a `SECURITY
+DEFINER` helper (`is_shared_with()`, like `are_friends()`/`owns_habit()`) that bypasses the inner
+table's RLS. When designing cross-user visibility, test from the *recipient's* JWT, not just the
+owner's — the owner always passes owner-only policies and hides this class of bug.
+
 ## Completions never synced: reading a value assigned inside a setState updater (bug)
 **What happened:** Habit check-ins showed locally but vanished on refresh, and the DB had zero
 `habit_completions`. Root cause: `toggle` assigned `becameDone` *inside* the `setHabits(prev => …)`
