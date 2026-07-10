@@ -187,25 +187,27 @@ function App() {
   // ---- toggle (hero interaction) ----
   const toggle = useCallback((id, dKeyOverride) => {
     const dKey = dKeyOverride || dayKey(today);
-    let becameDone = null;
-    setHabits(prev => prev.map(h => {
-      if (h.id !== id) return h;
-      const cmp = { ...h.completions };
-      const wasDone = !!cmp[dKey];
-      if (wasDone) delete cmp[dKey]; else cmp[dKey] = true;
-      becameDone = !wasDone;
-      if (!wasDone) {
-        setTimeout(() => {
-          const streakNow = computeStreak({ ...h, completions: cmp }, today, pause);
-          showToast(pickToastLine(streakNow));
-        }, 350);
-      }
-      return { ...h, completions: cmp };
-    }));
-    if (signedInRef.current && becameDone !== null) {
+    // Compute becameDone from current state BEFORE setHabits. React only runs a
+    // setState updater synchronously via its eager-bailout optimization, which is
+    // skipped whenever the fiber already has a pending update (a realtime reload, a
+    // toast, etc.). Reading a variable assigned inside the updater on the next line is
+    // therefore unreliable — it left becameDone null and silently skipped the cloud
+    // write, so completions never persisted. Mirror addHabit: plain value, then setState.
+    const habit = habits.find(h => h.id === id);
+    if (!habit) return;
+    const becameDone = !habit.completions[dKey];
+    const cmp = { ...habit.completions };
+    if (becameDone) cmp[dKey] = true; else delete cmp[dKey];
+    setHabits(prev => prev.map(h => (h.id === id ? { ...h, completions: cmp } : h)));
+    if (becameDone) {
+      setTimeout(() => {
+        showToast(pickToastLine(computeStreak({ ...habit, completions: cmp }, today, pause)));
+      }, 350);
+    }
+    if (signedInRef.current) {
       window.Sync.setCompletion(id, dKey, becameDone).catch(() => {});
     }
-  }, [today, showToast, pause]);
+  }, [habits, today, showToast, pause]);
 
   // ---- pause actions ----
   const startPause = useCallback((p) => {
@@ -243,13 +245,16 @@ function App() {
   }, [showToast]);
 
   const editHabit = useCallback((id, data) => {
-    let merged = null;
-    setHabits(prev => prev.map(h => { if (h.id !== id) return h; merged = { ...h, ...data }; return merged; }));
+    // Same fix as toggle: compute `merged` from current state, not inside the updater
+    // (an updater-assigned value is unreliable on the next line — see toggle).
+    const existing = habits.find(h => h.id === id);
+    const merged = existing ? { ...existing, ...data } : null;
+    setHabits(prev => prev.map(h => (h.id === id ? { ...h, ...data } : h)));
     lsSet(LS.TOUCHED, true);
     setEditingHabit(null);
     if (signedInRef.current && merged) window.Sync.updateHabit(merged).catch(() => {});
     setTimeout(() => showToast(`Updated · ${data.name}`), 100);
-  }, [showToast]);
+  }, [habits, showToast]);
 
   const deleteHabit = useCallback((id) => {
     setHabits(prev => prev.filter(h => h.id !== id));

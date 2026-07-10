@@ -3,6 +3,23 @@
 Patterns learned from corrections, so the same mistake isn't repeated. One entry per lesson:
 what happened → the rule going forward.
 
+## Completions never synced: reading a value assigned inside a setState updater (bug)
+**What happened:** Habit check-ins showed locally but vanished on refresh, and the DB had zero
+`habit_completions`. Root cause: `toggle` assigned `becameDone` *inside* the `setHabits(prev => …)`
+updater, then read it on the next line to gate the cloud write (`if (becameDone !== null) Sync.setCompletion(…)`).
+React only runs a setState updater **synchronously** via its eager-bailout optimization, which is
+**skipped whenever the fiber already has a pending update** (a realtime reload, a queued toast, a
+prior setState). In that case the updater is deferred, `becameDone` stays `null`, and the write is
+silently skipped — worsened by `.catch(() => {})` hiding every failure. `addHabit` never had the
+bug because it built a plain `const` outside the updater. `editHabit` had the same latent bug.
+Confirmed with a React 18.3.1 repro: no pending update → updater runs inline (write fires); a
+pending `setState` first → updater deferred (`becameDone` null, write skipped).
+**Rule going forward:** NEVER read a variable assigned inside a `setState`/`useReducer` updater on
+a later synchronous line — updaters must be pure and their timing isn't guaranteed. Compute the
+value from current state *before* calling setState (put the fresh state in the `useCallback` deps),
+then pass it to both the updater and any side-effect. Also: don't `.catch(() => {})` sync writes —
+swallowing errors hides data loss; at minimum surface a toast.
+
 ## Magic-link "otp_expired" was a cross-browser PKCE mismatch, NOT a scanner (corrected)
 **What happened:** Email magic links kept returning `otp_expired`. I diagnosed a "mail/link
 scanner eating single-use links" and pushed toward code-based OTP + custom SMTP (Resend). **That
