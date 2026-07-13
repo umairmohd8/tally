@@ -126,6 +126,9 @@ function computeStreak(habit, today, pause) {
 }
 
 function slippedYesterday(habit, today, pause) {
+  // Weekly-count habits have no per-day cadence — you have the whole week to
+  // hit the target, so a single un-checked day is never a "slip".
+  if (getSchedule(habit).type === 'weekly_count') return false;
   const yesterday = addDays(today, -1);
   if (isPausedOn(yesterday, pause)) return false;
   if (!isScheduled(habit, yesterday)) return false;
@@ -220,7 +223,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
     const isToday = i === 0;
     const isYesterday = i === 1;
     let slippedDot = false;
-    if (isYesterday && !filled && sched && !paused) {
+    if (isYesterday && !filled && sched && !paused && !isWeekly) {
       for (let j = 2; j < 6; j++) {
         const dd = addDays(today, -j);
         if (isPausedOn(dd, pause)) continue;
