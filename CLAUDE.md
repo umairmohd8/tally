@@ -84,6 +84,7 @@ palette + light/dark themes).
 - Match the existing voice in user-facing copy: warm, lowercase, lightly playful (see the
   copy banks in `screens.jsx`).
 - Keep all CSS in `index.html`'s `<style>` block and use the existing palette variables.
+- When AI coding assistants make commits in this repository, they must include the name of the model they are using (e.g., 'Model: Gemini 3.1 Pro (Low)') in the commit message.
 
 ## Task tracking
 

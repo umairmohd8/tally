@@ -317,7 +317,17 @@ function App() {
   // ---- derived: today stats ----
   const todayKey = dayKey(today);
   const pausedToday = isPausedOn(today, pause);
-  const scheduledToday = habits.filter(h => isScheduled(h, today));
+  const scheduledToday = habits.filter(h => {
+    if (!isScheduled(h, today)) return false;
+    const sc = window.HabitUtils.getSchedule(h);
+    if (sc.type === 'weekly_count') {
+      const weekDone = window.HabitUtils.weekCompletions(h, today, pause);
+      const weekMet = weekDone >= (sc.count || 1);
+      const doneToday = !!h.completions[todayKey];
+      if (weekMet && !doneToday) return false;
+    }
+    return true;
+  });
   const completedToday = scheduledToday.filter(h => h.completions[todayKey]).length;
   const total = scheduledToday.length;
   const pct = total === 0 ? 0 : Math.round((completedToday / total) * 100);
@@ -362,10 +372,20 @@ function App() {
   // Predictable layout: don't reorder by completion state. Habit order stays put.
   const grouped = useMemo(() => {
     return TOD_BUCKETS.map(bucket => {
-      const list = habits.filter(h => (h.timeOfDay || 'whenever') === bucket.id);
+      const list = habits.filter(h => {
+        if ((h.timeOfDay || 'whenever') !== bucket.id) return false;
+        const sc = window.HabitUtils.getSchedule(h);
+        if (sc.type === 'weekly_count') {
+          const weekDone = window.HabitUtils.weekCompletions(h, today, pause);
+          const weekMet = weekDone >= (sc.count || 1);
+          const doneToday = !!h.completions[todayKey];
+          if (weekMet && !doneToday) return false;
+        }
+        return true;
+      });
       return { bucket, list };
     }).filter(g => g.list.length > 0);
-  }, [habits]);
+  }, [habits, today, pause, todayKey]);
 
   // date strings
   const dateStr = today.toLocaleString('en', { month: 'long', day: 'numeric' }).toLowerCase();

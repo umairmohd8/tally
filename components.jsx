@@ -23,7 +23,8 @@ const dayKey = (d) => {
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const startOfWeek = (date) => {
   const d = new Date(date); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
+  const day = d.getDay() || 7; // Convert Sunday (0) to 7
+  d.setDate(d.getDate() - (day - 1));
   return d;
 };
 
