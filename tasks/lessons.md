@@ -85,6 +85,27 @@ and don't diagnose "scanner" from failures that cross browsers. Only reach for c
 SMTP if the link genuinely fails within a single browser. Built-in Supabase email (magic link)
 works without SMTP — just rate-limited (~a few/hour) and template not customizable.
 
+## Magic-link emails arrived with EMPTY bodies — free-tier + built-in email provider (bug)
+**What happened:** Magic-link emails arrived with the subject rendered ("Your sign-in link") but a
+completely **blank body** (no link). Everything looked healthy: client `signInWithOtp` correct,
+`admin/generate_link` produced a valid non-empty ConfirmationURL + OTP, and the Management API
+(`GET /v1/projects/{ref}/config/auth`) showed populated, valid `mailer_templates_magic_link_content`.
+The tell was `mailer_templates_custom_contents.MAILER_TEMPLATES_MAGIC_LINK_CONTENT: false` (all
+templates `false`). A `PATCH /config/auth` to set the template returned the real cause:
+`"Email template modification is not available for free tier projects using the default email
+provider. Please upgrade your plan or configure a custom SMTP provider."` Supabase has since
+tightened the built-in ("default") email service — on **free tier + default provider**, template
+customization is disabled AND the built-in provider ships a degraded/empty body. This CONTRADICTS
+the earlier lesson above ("built-in works without SMTP"): it no longer does. Only fix is upgrade
+plan or configure custom SMTP (Resend: host `smtp.resend.com`, port 465, user `resend`, pass =
+`re_…` API key; sender must be a verified domain, or `onboarding@resend.dev` for self-only tests).
+**Rule going forward:** Supabase's built-in email is now dev-only and, on free tier, actively
+broken for real delivery (empty bodies, no template customization). For any real magic-link/OTP
+email, configure custom SMTP from the start — don't rely on the built-in provider. When email
+config looks perfect in the Management API but delivery is wrong, the `mailer_templates_custom_contents`
+booleans and a trial `PATCH /config/auth` surface plan/provider restrictions the GET hides.
+The earlier "built-in works without SMTP" note is superseded.
+
 ## Anon key trips the secret scanner even though it's public-by-design
 **What happened:** Committing `config.js` with the real Supabase anon key was blocked by the
 ggshield pre-commit hook (generic JWT detector). The key IS public (RLS protects data), but the
