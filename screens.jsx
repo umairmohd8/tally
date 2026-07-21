@@ -281,7 +281,354 @@ function WeeklyReview({ habits, today, pause }) {
   );
 }
 
+function ProfileScreen({
+  me,
+  habits,
+  friends,
+  signedIn,
+  session,
+  myCode,
+  onSaveProfile,
+  onSignOut,
+  onOpenSignIn,
+  theme,
+  setTheme,
+  tweaks,
+  setTweak
+}) {
+  const { colorOf, COLORS } = window.HabitUtils;
+  
+  // Local drafts so the user doesn't trigger saves on every keystroke, but saves on blur or submit.
+  const [nameDraft, setNameDraft] = React.useState(me.name || '');
+  const [bioDraft, setBioDraft] = React.useState(me.bio || '');
+  const [copied, setCopied] = React.useState(false);
+
+  // Sync drafts when 'me' object changes
+  React.useEffect(() => {
+    setNameDraft(me.name || '');
+    setBioDraft(me.bio || '');
+  }, [me]);
+
+  const saveName = () => {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== me.name) {
+      onSaveProfile({ ...me, name: trimmed });
+    } else {
+      setNameDraft(me.name || '');
+    }
+  };
+
+  const saveBio = () => {
+    const trimmed = bioDraft.trim();
+    if (trimmed !== me.bio) {
+      onSaveProfile({ ...me, bio: trimmed });
+    }
+  };
+
+  const selectColor = (colorKey) => {
+    onSaveProfile({ ...me, avatarColor: colorKey });
+  };
+
+  const selectEmoji = (emoji) => {
+    onSaveProfile({ ...me, avatarEmoji: emoji });
+  };
+
+  const clearEmoji = () => {
+    onSaveProfile({ ...me, avatarEmoji: '' });
+  };
+
+  const handleWeeklyTargetChange = (e) => {
+    const target = parseInt(e.target.value, 10);
+    onSaveProfile({ ...me, weeklyTarget: target });
+  };
+
+  const copyCode = () => {
+    if (!myCode) return;
+    try {
+      navigator.clipboard.writeText(myCode).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch (_) {}
+  };
+
+  // Predefined Emojis for avatar selector
+  const EMOJIS = ['🎯', '🧘', '🏃', '📝', '🥑', '💧', '📚', '☕️', '🎨', '🕯️', '🪴', '🌙'];
+
+  // Stats computation
+  const activeHabitsCount = habits.length;
+  const lifetimeCheckins = React.useMemo(() => {
+    return habits.reduce((sum, h) => sum + Object.keys(h.completions || {}).length, 0);
+  }, [habits]);
+  const bestStreak = React.useMemo(() => {
+    return habits.reduce((m, h) => Math.max(m, window.HabitUtils.computeStreak(h, new Date())), 0);
+  }, [habits]);
+
+  // Completions this week
+  const completionsThisWeek = React.useMemo(() => {
+    const today = new Date();
+    const start = window.HabitUtils.startOfWeek(today);
+    let count = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = window.HabitUtils.addDays(start, i);
+      const dk = window.HabitUtils.dayKey(d);
+      habits.forEach(h => {
+        if (h.completions && h.completions[dk]) count++;
+      });
+    }
+    return count;
+  }, [habits]);
+
+  const targetGoal = me.weeklyTarget !== undefined ? me.weeklyTarget : 5;
+  const goalProgressPct = Math.min(100, Math.round((completionsThisWeek / targetGoal) * 100));
+
+  const memberSinceStr = React.useMemo(() => {
+    if (me.createdAt) {
+      try {
+        const d = new Date(me.createdAt);
+        return d.toLocaleDateString('en', { month: 'long', year: 'numeric' }).toLowerCase();
+      } catch (_) {}
+    }
+    return 'local visitor';
+  }, [me.createdAt]);
+
+  const initial = me.avatarEmoji || (me.name || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <div className="profile-screen">
+      {/* Profile Header */}
+      <div className="profile-card profile-main-card">
+        <div className="profile-header-top">
+          <div className="profile-avatar-wrap">
+            <span className="avatar avatar-large" style={{ background: colorOf(me.avatarColor || 'pop') }}>
+              {initial}
+            </span>
+          </div>
+          <div className="profile-header-info">
+            <div className="profile-input-field">
+              <input
+                className="profile-name-input"
+                value={nameDraft}
+                placeholder="your name"
+                maxLength={24}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={saveName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveName();
+                  if (e.key === 'Escape') { setNameDraft(me.name || ''); e.target.blur(); }
+                }}
+              />
+            </div>
+            <div className="profile-input-field">
+              <input
+                className="profile-bio-input"
+                value={bioDraft}
+                placeholder="write a bio or motto..."
+                maxLength={60}
+                onChange={(e) => setBioDraft(e.target.value)}
+                onBlur={saveBio}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveBio();
+                  if (e.key === 'Escape') { setBioDraft(me.bio || ''); e.target.blur(); }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Avatar Customizer */}
+        <div className="profile-customizer">
+          <div className="customizer-section">
+            <div className="customizer-label">avatar color</div>
+            <div className="swatch-row" role="radiogroup" aria-label="Avatar color">
+              {COLORS.map(c => (
+                <button
+                  key={c.key}
+                  role="radio"
+                  aria-checked={me.avatarColor === c.key}
+                  aria-label={c.key}
+                  className="swatch-btn"
+                  style={{ '--swatch': c.value, position: 'relative' }}
+                  onClick={() => selectColor(c.key)}
+                >
+                  {me.avatarColor === c.key && <span className="swatch-selected-dot" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="customizer-section">
+            <div className="customizer-label">avatar emoji</div>
+            <div className="emoji-row">
+              {EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  className={`emoji-btn ${me.avatarEmoji === emoji ? 'active' : ''}`}
+                  onClick={() => selectEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+              {me.avatarEmoji && (
+                <button className="emoji-clear-btn" onClick={clearEmoji} title="Clear emoji">
+                  clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly Goal Card */}
+      <div className="profile-card">
+        <div className="card-title">weekly goal</div>
+        <div className="weekly-goal-editor">
+          <div className="goal-slider-row">
+            <span className="goal-label">target: {targetGoal} completions / week</span>
+            <input
+              type="range"
+              min="1"
+              max="35"
+              value={targetGoal}
+              className="goal-slider"
+              onChange={handleWeeklyTargetChange}
+            />
+          </div>
+          <div className="goal-progress-row">
+            <div className="goal-progress-bar-wrap">
+              <div className="goal-progress-bar-fill" style={{ width: goalProgressPct + '%' }} />
+            </div>
+            <span className="goal-progress-label">
+              {completionsThisWeek} completions logged this week ({goalProgressPct}%)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <div className="profile-card stat-card">
+          <div className="stat-num">{lifetimeCheckins}</div>
+          <div className="stat-label">lifetime completions</div>
+        </div>
+        <div className="profile-card stat-card">
+          <div className="stat-num">{activeHabitsCount}</div>
+          <div className="stat-label">active habits</div>
+        </div>
+        <div className="profile-card stat-card">
+          <div className="stat-num">{bestStreak}d</div>
+          <div className="stat-label">best streak</div>
+        </div>
+        <div className="profile-card stat-card">
+          <div className="stat-num" style={{ fontSize: '18px', padding: '6px 0' }}>{memberSinceStr}</div>
+          <div className="stat-label">member since</div>
+        </div>
+      </div>
+
+      {/* Preferences Section */}
+      <div className="profile-card">
+        <div className="card-title">preferences</div>
+        <div className="preferences-list">
+          <div className="preference-item">
+            <div className="pref-info">
+              <div className="pref-title">dark theme</div>
+              <div className="pref-desc">switch to a soothing dark aesthetic</div>
+            </div>
+            <button
+              className={`pref-toggle ${theme === 'dark' ? 'active' : ''}`}
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle dark theme"
+            >
+              <span className="toggle-handle" />
+            </button>
+          </div>
+          <div className="preference-item">
+            <div className="pref-info">
+              <div className="pref-title">progress hairline</div>
+              <div className="pref-desc">display a thin daily progress bar at the top</div>
+            </div>
+            <button
+              className={`pref-toggle ${tweaks.showProgressBar ? 'active' : ''}`}
+              onClick={() => setTweak('showProgressBar', !tweaks.showProgressBar)}
+              aria-label="Toggle progress hairline"
+            >
+              <span className="toggle-handle" />
+            </button>
+          </div>
+          <div className="preference-item">
+            <div className="pref-info">
+              <div className="pref-title">minimum viable day (mvd) button</div>
+              <div className="pref-desc">show the "i did one thing" button on hard days</div>
+            </div>
+            <button
+              className={`pref-toggle ${tweaks.showMVD ? 'active' : ''}`}
+              onClick={() => setTweak('showMVD', !tweaks.showMVD)}
+              aria-label="Toggle MVD button"
+            >
+              <span className="toggle-handle" />
+            </button>
+          </div>
+          <div className="preference-item">
+            <div className="pref-info">
+              <div className="pref-title">body-doubling counter</div>
+              <div className="pref-desc">display simulated checking in counters</div>
+            </div>
+            <button
+              className={`pref-toggle ${tweaks.showBodyDouble ? 'active' : ''}`}
+              onClick={() => setTweak('showBodyDouble', !tweaks.showBodyDouble)}
+              aria-label="Toggle body-doubling counter"
+            >
+              <span className="toggle-handle" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync/Account Section */}
+      <div className="profile-card">
+        {signedIn ? (
+          <div className="sync-section">
+            <div className="card-title">account</div>
+            <div className="sync-info-row">
+              <div className="sync-label">status</div>
+              <div className="sync-value">synced with supabase</div>
+            </div>
+            <div className="sync-info-row">
+              <div className="sync-label">email</div>
+              <div className="sync-value">{session?.user?.email || 'synced'}</div>
+            </div>
+            {myCode && (
+              <div className="sync-info-row">
+                <div className="sync-label">invite code</div>
+                <button className="invite-code profile-invite-code" onClick={copyCode} title="copy">
+                  {myCode}<span className="invite-copy">{copied ? 'copied' : 'copy'}</span>
+                </button>
+              </div>
+            )}
+            <button className="btn btn-secondary profile-sign-btn" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="sync-section">
+            <div className="card-title">sync & backup</div>
+            <div className="sync-blurb">
+              your habits are currently saved locally to this browser. sign in to back up your habits and sync them live across all your devices.
+            </div>
+            {window.Sync.enabled() ? (
+              <button className="btn btn-primary profile-sign-btn" onClick={onOpenSignIn}>
+                Sign in to sync
+              </button>
+            ) : (
+              <div className="sync-err">Backend not configured. Local storage only.</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 window.Screens = {
-  MVDButton, BodyDoubleCounter, RecoveryScreen, WeeklyReview,
+  MVDButton, BodyDoubleCounter, RecoveryScreen, WeeklyReview, ProfileScreen,
   pickToastLine, pickAllDoneLine, MVD_TOAST,
 };

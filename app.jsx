@@ -104,7 +104,11 @@ function App() {
   });
   const [me, setMe] = useState(() => {
     const stored = lsGet(LS.ME, null);
-    return (stored && typeof stored === 'object' && !Array.isArray(stored) && typeof stored.name === 'string') ? stored : window.Social.seedMe();
+    let currentMe = (stored && typeof stored === 'object' && !Array.isArray(stored) && typeof stored.name === 'string') ? stored : window.Social.seedMe();
+    if (!currentMe.createdAt) {
+      currentMe = { ...currentMe, createdAt: new Date().toISOString() };
+    }
+    return currentMe;
   });
   const [friends, setFriends] = useState(() => {
     const stored = lsGet(LS.FRIENDS, null);
@@ -299,13 +303,16 @@ function App() {
     setFriends(prev => prev.filter(f => f.id !== id));
     if (signedInRef.current) window.Sync.removeFriend(id).catch(() => {});
   }, []);
-  const renameMe = useCallback((name) => {
+  const saveProfile = useCallback((updatedMe) => {
     setMe(prev => {
-      const next = { ...prev, name: (name || '').trim() || prev.name };
+      const next = { ...prev, ...updatedMe };
       if (signedInRef.current) window.Sync.saveProfile(next).catch(() => {});
       return next;
     });
   }, []);
+  const renameMe = useCallback((name) => {
+    saveProfile({ name: (name || '').trim() });
+  }, [saveProfile]);
 
   const signOut = useCallback(async () => { try { await window.Sync.signOut(); } catch (_) {} setSession(null); showToast('Signed out · still on this device'); }, [showToast]);
 
@@ -434,6 +441,7 @@ function App() {
             <button role="tab" aria-selected={tab === 'today'} className="tab" onClick={() => setTab('today')}>Today</button>
             <button role="tab" aria-selected={tab === 'review'} className="tab" onClick={() => setTab('review')}>Review</button>
             <button role="tab" aria-selected={tab === 'friends'} className="tab" onClick={() => setTab('friends')}>Friends</button>
+            <button role="tab" aria-selected={tab === 'profile'} className="tab" onClick={() => setTab('profile')}>Profile</button>
           </div>
           {!pause && (
             <button
@@ -573,6 +581,24 @@ function App() {
           onAddFriend={addFriend}
           onRemoveFriend={removeFriend}
           onRenameMe={renameMe}
+        />
+      )}
+
+      {tab === 'profile' && (
+        <window.Screens.ProfileScreen
+          me={me}
+          habits={habits}
+          friends={friends}
+          signedIn={!!session}
+          session={session}
+          myCode={myCode}
+          onSaveProfile={saveProfile}
+          onSignOut={signOut}
+          onOpenSignIn={() => setSignInOpen(true)}
+          theme={theme}
+          setTheme={setTheme}
+          tweaks={tweaks}
+          setTweak={setTweak}
         />
       )}
 

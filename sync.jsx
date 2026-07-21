@@ -75,14 +75,36 @@
     const id = await uid(); if (!id) return null;
     let { data } = await sb().from('profiles').select('*').eq('id', id).maybeSingle();
     if (!data) {
-      data = { id, name: 'you', avatar_color: 'pop' };
+      data = { id, name: 'you', avatar_color: 'pop', bio: '', avatar_emoji: '', weekly_target: 5 };
       await sb().from('profiles').upsert(data);
     }
-    return { id: 'me', name: data.name, avatarColor: data.avatar_color };
+    return {
+      id: 'me',
+      name: data.name,
+      avatarColor: data.avatar_color,
+      bio: data.bio || '',
+      avatarEmoji: data.avatar_emoji || '',
+      weeklyTarget: data.weekly_target !== undefined ? data.weekly_target : 5,
+      createdAt: data.created_at
+    };
   }
   async function saveProfile(me) {
     const id = await uid(); if (!id) return;
-    await sb().from('profiles').update({ name: me.name, avatar_color: me.avatarColor }).eq('id', id);
+    const { error } = await sb().from('profiles').update({
+      name: me.name,
+      avatar_color: me.avatarColor,
+      bio: me.bio || '',
+      avatar_emoji: me.avatarEmoji || '',
+      weekly_target: me.weeklyTarget !== undefined ? me.weeklyTarget : 5
+    }).eq('id', id);
+    if (error) {
+      console.warn("Retrying profile save with basic columns due to error:", error);
+      const { error: e2 } = await sb().from('profiles').update({
+        name: me.name,
+        avatar_color: me.avatarColor
+      }).eq('id', id);
+      if (e2) throw e2;
+    }
   }
 
   // ---- habits ----
@@ -184,7 +206,7 @@
     if (error) throw error;
     const ids = (fr || []).map((r) => (r.user_a === me ? r.user_b : r.user_a));
     if (!ids.length) return [];
-    const { data: profs } = await sb().from('profiles').select('id,name,avatar_color').in('id', ids);
+    const { data: profs } = await sb().from('profiles').select('id,name,avatar_color,avatar_emoji').in('id', ids);
     const { data: habitRows } = await sb().from('habits').select('*').in('user_id', ids).is('deleted_at', null);
     const hids = (habitRows || []).map((h) => h.id);
     let comps = [];
@@ -199,7 +221,7 @@
       (habitsByUser[r.user_id] = habitsByUser[r.user_id] || []).push(rowToHabit(r, byHabit[r.id] || {}));
     });
     return (profs || []).map((p) => ({
-      id: p.id, name: p.name, avatarColor: p.avatar_color, habits: habitsByUser[p.id] || [],
+      id: p.id, name: p.name, avatarColor: p.avatar_color, avatarEmoji: p.avatar_emoji || '', habits: habitsByUser[p.id] || [],
     }));
   }
   async function loadHabitShares(habitId) {

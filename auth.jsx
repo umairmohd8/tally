@@ -84,7 +84,7 @@ function AccountControl({ session, me, onOpenSignIn, onSignOut }) {
   if (!session) {
     return <button className="icon-btn" onClick={onOpenSignIn} aria-label="Sign in to sync" title="Sign in to sync"><window.Icons.Cloud /></button>;
   }
-  const initial = ((me && me.name) || '?').trim().charAt(0).toUpperCase();
+  const initial = me && me.avatarEmoji ? me.avatarEmoji : ((me && me.name) || '?').trim().charAt(0).toUpperCase();
   return (
     <div style={{ position: 'relative' }}>
       <button className="avatar avatar-sm" aria-label="Account" onClick={(e) => { e.stopPropagation(); setMenu((v) => !v); }}
