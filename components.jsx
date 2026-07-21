@@ -223,6 +223,8 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
     const paused = isPausedOn(d, pause);
     const isToday = i === 0;
     const isYesterday = i === 1;
+    const isDayBeforeYesterday = i === 2;
+    const interactive = !ended && !paused && (i <= 2);
     let slippedDot = false;
     if (isYesterday && !filled && sched && !paused && !isWeekly) {
       for (let j = 2; j < 6; j++) {
@@ -231,7 +233,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
         if (habit.completions[dayKey(dd)]) { slippedDot = true; break; }
       }
     }
-    dots.push({ k, filled, sched, paused, isToday, slippedDot });
+    dots.push({ k, filled, sched, paused, isToday, isYesterday, isDayBeforeYesterday, interactive, slippedDot });
   }
 
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -312,14 +314,51 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
           <span className="item">{scheduleLabel(habit)}</span>
           {timeLabel && <span className="meta-pill time">{timeLabel}</span>}
           <span className="streak-dots" aria-label="Last 7 days">
-            {dots.map((dot) => (
-              <span
-                key={dot.k}
-                className={`streak-dot ${dot.filled ? 'filled' : ''} ${dot.slippedDot ? 'slipped' : ''} ${dot.paused ? 'paused' : ''} ${dot.isToday ? 'today' : ''}`}
-                style={dot.filled && !dot.paused ? { background: swatch } : undefined}
-                title={dot.paused ? `${dot.k} · paused` : dot.k}
-              />
-            ))}
+            {dots.map((dot) => {
+              const dotClass = `streak-dot ${dot.filled ? 'filled' : ''} ${dot.slippedDot ? 'slipped' : ''} ${dot.paused ? 'paused' : ''} ${dot.isToday ? 'today' : ''} ${dot.interactive ? 'interactive' : ''}`;
+              const titleText = (() => {
+                if (dot.paused) return `${dot.k} · paused`;
+                if (dot.interactive) {
+                  const dayName = dot.isToday ? 'today' : (dot.isYesterday ? 'yesterday' : 'day before yesterday');
+                  return `${dot.k} (${dayName}) · click to toggle`;
+                }
+                return dot.k;
+              })();
+
+              if (dot.interactive) {
+                return (
+                  <button
+                    key={dot.k}
+                    type="button"
+                    className={dotClass}
+                    style={dot.filled && !dot.paused ? { background: swatch, borderColor: swatch } : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (navigator.vibrate && !dot.filled) {
+                        try { navigator.vibrate(8); } catch (_) {}
+                      }
+                      onToggle(habit.id, dot.k);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                      }
+                    }}
+                    title={titleText}
+                    aria-label={`Toggle completion for ${titleText}`}
+                  />
+                );
+              }
+
+              return (
+                <span
+                  key={dot.k}
+                  className={dotClass}
+                  style={dot.filled && !dot.paused ? { background: swatch } : undefined}
+                  title={titleText}
+                />
+              );
+            })}
           </span>
         </div>
       </div>

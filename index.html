@@ -219,15 +219,40 @@
   .meta-pill.shared { background: var(--cloud-soft); color: var(--cloud-ink); border: 1px solid color-mix(in srgb, var(--cloud) 35%, transparent); }
 
   /* 7-day streak dots */
-  .streak-dots { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .streak-dots { display: flex; gap: 5px; align-items: center; margin-left: auto; }
   .streak-dot {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--smoke);
-    transition: background-color 200ms ease;
+    border: none;
+    padding: 0;
+    transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+    display: block;
   }
   .streak-dot.filled { background: var(--pop); }
   .streak-dot.slipped { background: var(--butter); }
   .streak-dot.today { box-shadow: 0 0 0 2px var(--pop-soft); }
+  .streak-dot.interactive {
+    cursor: pointer;
+    position: relative;
+  }
+  /* Invisible larger click target for usability */
+  .streak-dot.interactive::after {
+    content: '';
+    position: absolute;
+    top: -10px; left: -10px; right: -10px; bottom: -10px;
+    border-radius: 50%;
+  }
+  .streak-dot.interactive:hover {
+    transform: scale(1.4);
+    box-shadow: 0 0 0 2px var(--ink-20);
+  }
+  .streak-dot.interactive.today:hover {
+    box-shadow: 0 0 0 2px var(--pop-soft), 0 0 0 4px var(--ink-20);
+  }
+  .streak-dot.interactive:focus-visible {
+    outline: 2px solid var(--pop);
+    outline-offset: 2px;
+  }
 
   .habit-actions { display: flex; align-items: center; }
 
