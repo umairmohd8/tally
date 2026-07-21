@@ -99,4 +99,128 @@ function AccountControl({ session, me, onOpenSignIn, onSignOut }) {
   );
 }
 
-window.Auth = { SignInModal, AccountControl };
+function CompleteProfileModal({ me, onSaveProfile, onClose }) {
+  const { COLORS, colorOf } = window.HabitUtils;
+  const [name, setName] = useStateA(me.name || 'you');
+  const [avatarColor, setAvatarColor] = useStateA(me.avatarColor || 'pop');
+  const [avatarEmoji, setAvatarEmoji] = useStateA(me.avatarEmoji || '');
+  const [weeklyTarget, setWeeklyTarget] = useStateA(me.weeklyTarget !== undefined ? me.weeklyTarget : 5);
+
+  const EMOJIS = ['🎯', '🧘', '🏃', '📝', '🥑', '💧', '📚', '☕️', '🎨', '🕯️', '🪴', '🌙'];
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const submit = () => {
+    const trimmedName = name.trim();
+    onSaveProfile({
+      ...me,
+      name: trimmedName || 'you',
+      avatarColor,
+      avatarEmoji,
+      weeklyTarget
+    });
+    onClose();
+  };
+
+  const initial = avatarEmoji || (name || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Complete your profile">
+      <div className="modal onboarding-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <div className="modal-eyebrow">Onboarding</div>
+            <div className="modal-title">Complete your profile</div>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><window.Icons.X /></button>
+        </div>
+        <div className="modal-body onboarding-modal-body">
+          <p className="sync-blurb">Let's personalize your habit tracking experience! You can always change these later in the Profile tab.</p>
+          
+          {/* Avatar Preview */}
+          <div className="onboarding-avatar-preview-wrap">
+            <span className="avatar avatar-large" style={{ background: colorOf(avatarColor) }}>
+              {initial}
+            </span>
+          </div>
+
+          {/* Name Field */}
+          <div className="field">
+            <label className="field-label" htmlFor="onboarding-name-input">what should we call you?</label>
+            <input
+              id="onboarding-name-input"
+              className="text-input"
+              type="text"
+              placeholder="your name"
+              maxLength={24}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Color Swatches */}
+          <div className="field">
+            <label className="field-label">choose an avatar color</label>
+            <div className="swatch-row" role="radiogroup" aria-label="Avatar color">
+              {COLORS.map(c => (
+                <button
+                  key={c.key}
+                  role="radio"
+                  aria-checked={avatarColor === c.key}
+                  aria-label={c.key}
+                  className="swatch-btn"
+                  style={{ '--swatch': c.value, position: 'relative' }}
+                  onClick={() => setAvatarColor(c.key)}
+                >
+                  {avatarColor === c.key && <span className="swatch-selected-dot" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Emoji Selection */}
+          <div className="field">
+            <label className="field-label">choose an emoji (optional)</label>
+            <div className="emoji-row">
+              {EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  className={`emoji-btn ${avatarEmoji === emoji ? 'active' : ''}`}
+                  onClick={() => setAvatarEmoji(avatarEmoji === emoji ? '' : emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Weekly Goal Slider */}
+          <div className="field">
+            <label className="field-label">weekly goal: {weeklyTarget} completions / week</label>
+            <input
+              type="range"
+              min="1"
+              max="35"
+              value={weeklyTarget}
+              className="goal-slider"
+              onChange={(e) => setWeeklyTarget(parseInt(e.target.value, 10))}
+            />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <div className="modal-foot-end">
+            <button className="btn btn-ghost" onClick={onClose}>Skip for now</button>
+            <button className="btn btn-primary" onClick={submit}>Save & continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+window.Auth = { SignInModal, AccountControl, CompleteProfileModal };

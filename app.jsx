@@ -118,6 +118,7 @@ function App() {
   const [myCode, setMyCode] = useState(null);
   const [session, setSession] = useState(null);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const signedInRef = useRef(false);
   useEffect(() => { signedInRef.current = !!session; }, [session]);
   const [tab, setTab] = useState('today');
@@ -182,10 +183,15 @@ function App() {
           window.Sync.loadHabits(), window.Sync.loadFriends(), window.Sync.myInviteCode(),
         ]);
         setHabits(cloudHabits);
-        if (cloudMe) setMe(cloudMe);
+        if (cloudMe) {
+          setMe(cloudMe);
+          if (cloudMe.isNew) {
+            setOnboardingOpen(true);
+          }
+        }
         setFriends(cloudFriends);
         setMyCode(code);
-        showToast(uploaded ? `Synced ${uploaded} habit${uploaded === 1 ? '' : 's'} to your account` : 'Synced. Welcome back.');
+        showToast(uploaded ? `Synced ${uploaded} habit${uploaded === 1 ? '' : 's'} to your account` : (cloudMe?.isNew ? 'Welcome to tally!' : 'Synced. Welcome back.'));
         unsubRealtime = window.Sync.subscribe(s.user.id, async () => {
           try { setHabits(await window.Sync.loadHabits()); } catch (_) {}
         });
@@ -625,6 +631,15 @@ function App() {
 
       {/* Sign-in modal */}
       {signInOpen && <window.Auth.SignInModal onClose={() => setSignInOpen(false)} />}
+
+      {/* Complete Profile (Onboarding) modal */}
+      {onboardingOpen && (
+        <window.Auth.CompleteProfileModal
+          me={me}
+          onSaveProfile={saveProfile}
+          onClose={() => setOnboardingOpen(false)}
+        />
+      )}
 
       {/* Toast */}
       <div className="toast-zone">

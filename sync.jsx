@@ -74,7 +74,9 @@
   async function loadProfile() {
     const id = await uid(); if (!id) return null;
     let { data } = await sb().from('profiles').select('*').eq('id', id).maybeSingle();
+    let isNew = false;
     if (!data) {
+      isNew = true;
       data = { id, name: 'you', avatar_color: 'pop', bio: '', avatar_emoji: '', weekly_target: 5 };
       await sb().from('profiles').upsert(data);
     }
@@ -85,7 +87,8 @@
       bio: data.bio || '',
       avatarEmoji: data.avatar_emoji || '',
       weeklyTarget: data.weekly_target !== undefined ? data.weekly_target : 5,
-      createdAt: data.created_at
+      createdAt: data.created_at,
+      isNew: isNew
     };
   }
   async function saveProfile(me) {
