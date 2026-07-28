@@ -257,9 +257,10 @@ function App() {
   // ---- add ----
   const addHabit = useCallback((data) => {
     const { sharedWith, ...habitData } = data;
+    const sDate = habitData.startDate || dayKey(new Date());
     const habit = {
       id: window.Sync.uuid(),
-      ...habitData, completions: {}, createdAt: dayKey(new Date()),
+      ...habitData, completions: {}, createdAt: sDate, startDate: sDate,
     };
     setHabits(prev => [...prev, habit]);
     lsSet(LS.TOUCHED, true);
@@ -278,8 +279,9 @@ function App() {
     // value is unreliable on the next line — see toggle). habitData excludes sharedWith,
     // which is persisted separately via setHabitShares below.
     const existing = habits.find(h => h.id === id);
-    const merged = existing ? { ...existing, ...habitData } : null;
-    setHabits(prev => prev.map(h => (h.id === id ? { ...h, ...habitData } : h)));
+    const sDate = habitData.startDate || (existing ? existing.startDate || existing.createdAt : dayKey(new Date()));
+    const merged = existing ? { ...existing, ...habitData, createdAt: sDate, startDate: sDate } : null;
+    setHabits(prev => prev.map(h => (h.id === id ? { ...h, ...habitData, createdAt: sDate, startDate: sDate } : h)));
     lsSet(LS.TOUCHED, true);
     setEditingHabit(null);
     if (signedInRef.current && merged) {

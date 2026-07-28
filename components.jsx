@@ -34,10 +34,17 @@ function getSchedule(habit) {
   return { type: 'daily' };
 }
 // ---- Deadline ----
+// ---- Deadline & Start Date ----
 // habit.endDate is a "YYYY-MM-DD" dayKey = the LAST active day (inclusive). Absent = forever.
 function isEnded(habit, date) {
   if (!habit || !habit.endDate) return false;
   return dayKey(date) > habit.endDate;
+}
+function isNotStarted(habit, date) {
+  if (!habit) return false;
+  const start = habit.startDate || habit.createdAt;
+  if (!start) return false;
+  return dayKey(date) < start;
 }
 // inclusive day count between two dayKeys ("2026-05-29")
 function dayCountBetween(startKey, endKey) {
@@ -57,6 +64,7 @@ function endDateLabel(habit) {
 
 const isScheduled = (habit, date) => {
   if (isEnded(habit, date)) return false;
+  if (isNotStarted(habit, date)) return false;
   const sc = getSchedule(habit);
   if (sc.type === 'daily') return true;
   if (sc.type === 'specific_days') return (sc.days || []).includes(date.getDay());
@@ -97,6 +105,7 @@ function computeStreak(habit, today, pause) {
     if (weekCompletions(habit, today, pause) >= target) weeks++;
     let cursor = addDays(startOfWeek(today), -7);
     for (let i = 0; i < 104; i++) {
+      if (isNotStarted(habit, cursor)) break;
       if (weekCompletions(habit, cursor, pause) >= target) weeks++;
       else break;
       cursor = addDays(cursor, -7);
@@ -110,6 +119,7 @@ function computeStreak(habit, today, pause) {
     cur = addDays(cur, -1);
   }
   for (let i = 0; i < 365; i++) {
+    if (isNotStarted(habit, cur)) break;
     if (isPausedOn(cur, pause)) {
       // bridge
     } else if (isScheduled(habit, cur)) {
@@ -131,11 +141,13 @@ function slippedYesterday(habit, today, pause) {
   // hit the target, so a single un-checked day is never a "slip".
   if (getSchedule(habit).type === 'weekly_count') return false;
   const yesterday = addDays(today, -1);
+  if (isNotStarted(habit, yesterday)) return false;
   if (isPausedOn(yesterday, pause)) return false;
   if (!isScheduled(habit, yesterday)) return false;
   if (habit.completions[dayKey(yesterday)]) return false;
   for (let i = 2; i < 6; i++) {
     const d = addDays(today, -i);
+    if (isNotStarted(habit, d)) break;
     if (isPausedOn(d, pause)) continue;
     if (habit.completions[dayKey(d)]) return true;
   }
@@ -147,6 +159,7 @@ function weekCompletions(habit, anyDateInWeek, pause) {
   let n = 0;
   for (let i = 0; i < 7; i++) {
     const d = addDays(start, i);
+    if (isNotStarted(habit, d)) continue;
     if (isPausedOn(d, pause)) continue;
     if (habit.completions[dayKey(d)]) n++;
   }
@@ -175,7 +188,7 @@ window.HabitUtils = {
   getSchedule, isScheduled, scheduleLabel,
   computeStreak, slippedYesterday, weekCompletions,
   formatReminderTime, TOD_BUCKETS, isPausedOn,
-  isEnded, endDateLabel, dayCountBetween,
+  isEnded, isNotStarted, endDateLabel, dayCountBetween,
 };
 
 // ============================================
@@ -194,7 +207,7 @@ function CheckMark() {
 // ============================================
 function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap }) {
   const {
-    colorOf, dayKey, addDays, isScheduled, computeStreak,
+    colorOf, dayKey, addDays, isScheduled, isNotStarted, computeStreak,
     getSchedule, weekCompletions, scheduleLabel, formatReminderTime,
     slippedYesterday, isPausedOn, isEnded, dayCountBetween,
   } = window.HabitUtils;
@@ -212,6 +225,16 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
   const pausedToday = isPausedOn(today, pause);
   const ended = isEnded(habit, today);
   const endedDays = ended && habit.endDate ? dayCountBetween(habit.createdAt || habit.endDate, habit.endDate) : 0;
+  const notStarted = isNotStarted(habit, today);
+  const startKey = habit.startDate || habit.createdAt;
+
+  const formatStartDate = (key) => {
+    if (!key) return '';
+    try {
+      const d = new Date(key + 'T00:00:00');
+      return d.toLocaleString('en', { month: 'short', day: 'numeric' }).toLowerCase();
+    } catch (_) { return key; }
+  };
 
   // 7-day dots
   const dots = [];
@@ -224,7 +247,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
     const isToday = i === 0;
     const isYesterday = i === 1;
     const isDayBeforeYesterday = i === 2;
-    const interactive = !ended && !paused && (i <= 2);
+    const interactive = !ended && !paused && !notStarted && (i <= 2);
     let slippedDot = false;
     if (isYesterday && !filled && sched && !paused && !isWeekly) {
       for (let j = 2; j < 6; j++) {
@@ -248,6 +271,10 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
   const handleToggle = (e) => {
     e?.stopPropagation();
     if (ended) return;
+    if (notStarted) {
+      onPausedTap && onPausedTap();
+      return;
+    }
     if (pausedToday) {
       onPausedTap && onPausedTap();
       return;
@@ -270,11 +297,11 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
   };
 
   return (
-    <div className={`habit ${done || weekMet ? 'done' : ''} ${!scheduledToday && !isWeekly && !ended ? 'rest' : ''} ${pausedToday ? 'paused' : ''} ${ended ? 'ended' : ''}`}>
+    <div className={`habit ${done || weekMet ? 'done' : ''} ${!scheduledToday && !isWeekly && !ended && !notStarted ? 'rest' : ''} ${notStarted ? 'not-started' : ''} ${pausedToday ? 'paused' : ''} ${ended ? 'ended' : ''}`}>
       <button
         className={`check ${done ? 'checked' : ''} ${pulse ? 'pulse' : ''}`}
         onClick={handleToggle}
-        disabled={ended}
+        disabled={ended || notStarted}
         aria-label={done ? `Mark ${habit.name} incomplete` : `Mark ${habit.name} complete`}
         style={{ borderColor: done && !ended ? swatch : undefined, background: done && !ended ? swatch : undefined }}
       >
@@ -289,10 +316,13 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
           {ended && (
             <span className="meta-pill finished">{endedDays > 0 ? `done · ${endedDays} day${endedDays === 1 ? '' : 's'}` : 'finished'}</span>
           )}
+          {notStarted && (
+            <span className="meta-pill" style={{ background: 'transparent', color: 'var(--ink-40)', border: '1px solid var(--smoke)' }}>starts {formatStartDate(startKey)}</span>
+          )}
           {habit.shareMode && habit.shareMode !== 'private' && (
             <span className="meta-pill shared" title="Friends can see this habit">shared</span>
           )}
-          {!scheduledToday && !isWeekly && !ended && (
+          {!notStarted && !scheduledToday && !isWeekly && !ended && (
             <span className="meta-pill" style={{ background: 'transparent', color: 'var(--ink-30)', border: '1px solid var(--smoke)' }}>rest day</span>
           )}
           {slipped && !done && scheduledToday && !pausedToday && (
@@ -464,7 +494,29 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
   // 20 days from now (a chip can never silently end an existing habit in the past).
   const DURATIONS = [7, 14, 21, 30, 66];
   const todayKey = dayKey(new Date());
-  const todayObj = new Date(todayKey + 'T00:00:00');
+  const todayObj = React.useMemo(() => new Date(todayKey + 'T00:00:00'), [todayKey]);
+  const tomorrowKey = React.useMemo(() => dayKey(addDays(todayObj, 1)), [todayObj]);
+  const nextMondayKey = React.useMemo(() => {
+    const daysUntilMonday = (8 - (todayObj.getDay() || 7)) % 7 || 7;
+    return dayKey(addDays(todayObj, daysUntilMonday));
+  }, [todayObj]);
+
+  const [startDate, setStartDate] = React.useState(habit ? (habit.startDate || habit.createdAt || todayKey) : todayKey);
+
+  const startDateSummary = () => {
+    if (!startDate || startDate === todayKey) return 'starts today';
+    try {
+      const s = new Date(startDate + 'T00:00:00');
+      const f = s.toLocaleString('en', { month: 'short', day: 'numeric' }).toLowerCase();
+      const diff = Math.round((s - todayObj) / 86400000);
+      if (diff === 1) return `starts tomorrow (${f})`;
+      if (diff > 1) return `starts in ${diff} days (${f})`;
+      if (diff === -1) return `started yesterday (${f})`;
+      if (diff < -1) return `started ${Math.abs(diff)} days ago (${f})`;
+      return `starts ${f}`;
+    } catch (_) { return ''; }
+  };
+
   const setDuration = (n) => setEndDate(dayKey(addDays(todayObj, n - 1)));
   const isDuration = (n) => endDate === dayKey(addDays(todayObj, n - 1));
   const deadlineDays = endDate ? dayCountBetween(todayKey, endDate) : 0;
@@ -480,11 +532,14 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
 
   const submit = () => {
     if (!name.trim()) return;
+    if (endDate && endDate < startDate) return;
     onSubmit({
       name: name.trim(),
       color,
       timeOfDay,
       schedule: buildSchedule(),
+      startDate: startDate || todayKey,
+      createdAt: startDate || todayKey,
       reminderTime: reminderTime || null,
       endDate: endDate || null,
       shareMode,
@@ -604,6 +659,42 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
           </div>
 
           <div className="field">
+            <div className="field-label">Start date <span className="opt">· when this habit begins</span></div>
+            <div className="chip-row" role="radiogroup" aria-label="Start date">
+              <button
+                type="button"
+                className="chip"
+                role="radio"
+                aria-checked={startDate === todayKey}
+                onClick={() => setStartDate(todayKey)}
+              >Today</button>
+              <button
+                type="button"
+                className="chip"
+                role="radio"
+                aria-checked={startDate === tomorrowKey}
+                onClick={() => setStartDate(tomorrowKey)}
+              >Tomorrow</button>
+              <button
+                type="button"
+                className="chip"
+                role="radio"
+                aria-checked={startDate === nextMondayKey}
+                onClick={() => setStartDate(nextMondayKey)}
+              >Next Monday</button>
+            </div>
+            <div className="time-field" style={{ marginTop: 8 }}>
+              <input
+                type="date"
+                value={startDate || todayKey}
+                onChange={(e) => setStartDate(e.target.value || todayKey)}
+                aria-label="Custom start date"
+              />
+            </div>
+            <div className="deadline-summary">{startDateSummary()}</div>
+          </div>
+
+          <div className="field">
             <div className="field-label">Deadline <span className="opt">· optional · ends after a stretch</span></div>
             <div className="chip-row" role="group" aria-label="Deadline">
               <button
@@ -626,7 +717,7 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
               <input
                 type="date"
                 value={endDate || ''}
-                min={todayKey}
+                min={startDate || todayKey}
                 onChange={(e) => setEndDate(e.target.value || null)}
                 aria-label="Custom end date"
               />

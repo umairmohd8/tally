@@ -23,7 +23,8 @@
     return {
       id: r.id, name: r.name, color: r.color, schedule: r.schedule,
       timeOfDay: r.time_of_day, reminderTime: r.reminder_time,
-      endDate: r.end_date, shareMode: r.share_mode || 'private', createdAt: r.created_at,
+      endDate: r.end_date, shareMode: r.share_mode || 'private',
+      createdAt: r.created_at, startDate: r.created_at,
       completions: completions || {},
     };
   }
@@ -32,7 +33,7 @@
       id: h.id, user_id: userId, name: h.name, color: h.color,
       schedule: h.schedule, time_of_day: h.timeOfDay || 'whenever',
       reminder_time: h.reminderTime || null, end_date: h.endDate || null,
-      share_mode: h.shareMode || 'private', created_at: h.createdAt, updated_at: new Date().toISOString(),
+      share_mode: h.shareMode || 'private', created_at: h.startDate || h.createdAt, updated_at: new Date().toISOString(),
     };
   }
   async function uid() {
@@ -131,7 +132,7 @@
   }
   async function updateHabit(h) {
     const id = await uid(); if (!id) return;
-    const row = habitToRow(h, id); delete row.user_id; delete row.created_at;
+    const row = habitToRow(h, id); delete row.user_id;
     const { error } = await sb().from('habits').update(row).eq('id', h.id);
     if (error) throw error;
   }
