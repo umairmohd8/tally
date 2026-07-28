@@ -175,6 +175,15 @@ function formatReminderTime(t) {
   return mm === 0 ? `${h12}${period}` : `${h12}:${String(mm).padStart(2, '0')}${period}`;
 }
 
+function getTimeOfDayFromTime(t) {
+  if (!t) return null;
+  const [hh] = t.split(':').map(Number);
+  if (Number.isNaN(hh)) return null;
+  if (hh >= 5 && hh < 12) return 'morning';
+  if (hh >= 12 && hh < 17) return 'afternoon';
+  return 'evening';
+}
+
 // ---- Time-of-day buckets ----
 const TOD_BUCKETS = [
   { id: 'morning',   label: 'morning',   glyph: '☀' },
@@ -187,7 +196,7 @@ window.HabitUtils = {
   COLORS, colorOf, dayKey, addDays, startOfWeek,
   getSchedule, isScheduled, scheduleLabel,
   computeStreak, slippedYesterday, weekCompletions,
-  formatReminderTime, TOD_BUCKETS, isPausedOn,
+  formatReminderTime, getTimeOfDayFromTime, TOD_BUCKETS, isPausedOn,
   isEnded, isNotStarted, endDateLabel, dayCountBetween,
 };
 
@@ -755,7 +764,12 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
                   ref={timeRef}
                   type="time"
                   value={reminderTime}
-                  onChange={(e) => setReminderTime(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setReminderTime(val);
+                    const tod = getTimeOfDayFromTime(val);
+                    if (tod) setTimeOfDay(tod);
+                  }}
                 />
                 <button className="time-clear" onClick={() => setReminderTime('')} aria-label="Clear">
                   <window.Icons.X />
@@ -765,7 +779,10 @@ function HabitModal({ habit, onClose, onSubmit, onArchive, defaultTimeOfDay, fri
               <button
                 className="time-field-empty"
                 onClick={() => {
-                  setReminderTime('07:30');
+                  const defaultTime = '07:30';
+                  setReminderTime(defaultTime);
+                  const tod = getTimeOfDayFromTime(defaultTime);
+                  if (tod) setTimeOfDay(tod);
                   setTimeout(() => timeRef.current?.focus(), 0);
                 }}
               >
