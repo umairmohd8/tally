@@ -384,7 +384,7 @@ function App() {
   }, [justEndedPause]);
 
   // ---- group by time of day ----
-  // Predictable layout: don't reorder by completion state. Habit order stays put.
+  // Predictable layout: grouped by time of day, sorted chronologically by reminderTime within each bucket.
   const grouped = useMemo(() => {
     return TOD_BUCKETS.map(bucket => {
       const list = habits.filter(h => {
@@ -397,6 +397,14 @@ function App() {
           if (weekMet && !doneToday) return false;
         }
         return true;
+      });
+      list.sort((a, b) => {
+        if (a.reminderTime && b.reminderTime) {
+          return a.reminderTime.localeCompare(b.reminderTime);
+        }
+        if (a.reminderTime) return -1;
+        if (b.reminderTime) return 1;
+        return 0;
       });
       return { bucket, list };
     }).filter(g => g.list.length > 0);
