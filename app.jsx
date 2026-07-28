@@ -23,6 +23,7 @@ const LS = {
   ME:        'tally-me',
   FRIENDS:   'tally-friends',
   TOUCHED:   'tally-touched', // user shaped their own habit list (add/edit/delete) — gates seed migration
+  COMPLETED_COLLAPSED: 'tally-completed-collapsed',
 };
 function lsGet(k, fallback) {
   try {
@@ -130,6 +131,7 @@ function App() {
   const [toast, setToast] = useState(null);
   const [mvdLogged, setMvdLogged] = useState(() => lsGet(LS.MVD, {}));
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [completedCollapsed, setCompletedCollapsed] = useState(() => lsGet(LS.COMPLETED_COLLAPSED, true));
   const [tweaks, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
   const toastTimerRef = useRef(null);
 
@@ -139,6 +141,7 @@ function App() {
   useEffect(() => { lsSet(LS.FRIENDS, friends); }, [friends]);
   useEffect(() => { lsSet(LS.PAUSE, pause); }, [pause]);
   useEffect(() => { lsSet(LS.MVD, mvdLogged); }, [mvdLogged]);
+  useEffect(() => { lsSet(LS.COMPLETED_COLLAPSED, completedCollapsed); }, [completedCollapsed]);
 
   // apply theme
   useEffect(() => {
@@ -368,11 +371,17 @@ function App() {
     return Math.round((e - s) / 86400000) + 1;
   }, [justEndedPause]);
 
-  // ---- group by time of day ----
+  // ---- ended/completed habits (passed deadline) ----
+  const endedHabits = useMemo(() => {
+    return habits.filter(h => window.HabitUtils.isEnded(h, today));
+  }, [habits, today]);
+
+  // ---- group active habits by time of day ----
   // Predictable layout: don't reorder by completion state. Habit order stays put.
   const grouped = useMemo(() => {
     return TOD_BUCKETS.map(bucket => {
       const list = habits.filter(h => {
+        if (window.HabitUtils.isEnded(h, today)) return false;
         if ((h.timeOfDay || 'whenever') !== bucket.id) return false;
         const sc = window.HabitUtils.getSchedule(h);
         if (sc.type === 'weekly_count') {
@@ -542,6 +551,33 @@ function App() {
                 <window.Icons.Plus size={13} /> add habit
               </button>
             </div>
+
+            {endedHabits.length > 0 && (
+              <div className="bucket completed-bucket" style={{ marginTop: 24 }}>
+                <div
+                  className="bucket-head completed-head"
+                  onClick={() => setCompletedCollapsed(c => !c)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCompletedCollapsed(c => !c); } }}
+                >
+                  <div className="bucket-title">
+                    <span className="chevron-icon" style={{ display: 'inline-flex', alignItems: 'center', transition: 'transform 200ms ease', transform: completedCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+                      <window.Icons.Chevron size={15} />
+                    </span>
+                    <span className="bucket-name" style={{ color: 'var(--ink-50)' }}>Completed habits</span>
+                  </div>
+                  <span className="bucket-count">{endedHabits.length} finished</span>
+                </div>
+                {!completedCollapsed && (
+                  <div className="habit-list">
+                    {endedHabits.map(h => (
+                      <HabitRow key={h.id} habit={h} today={today} pause={pause} onToggle={toggle} onDelete={deleteHabit} onEdit={setEditingHabit} onPausedTap={onPausedTap} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {showMVD && <MVDButton onLog={logMVD} />}
 

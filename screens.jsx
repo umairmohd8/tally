@@ -125,8 +125,8 @@ const PAUSE_HERO = {
   custom:   { hero: ["You're back.", "That's the hard part."],   sub: (d) => `${d} day${d === 1 ? '' : 's'} paused. Streaks held.` },
 };
 function RecoveryScreen({ habits, today, gapDays = 5, pauseReason, onResume, onShowAll, onToggleHabit }) {
-  const { dayKey, colorOf } = window.HabitUtils;
-  const ranked = [...habits].sort((a, b) => {
+  const { dayKey, colorOf, isEnded } = window.HabitUtils;
+  const ranked = habits.filter(h => !isEnded(h, today)).sort((a, b) => {
     const ca = Object.keys(a.completions).length;
     const cb = Object.keys(b.completions).length;
     return cb - ca;

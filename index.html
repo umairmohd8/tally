@@ -137,6 +137,17 @@
     line-height: 1; padding: 2px 0;
   }
   .bucket-count { font-family: var(--mono); font-size: 11px; color: var(--ink-30); }
+  .completed-head {
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 8px;
+    margin: 0 -4px 10px;
+    border-radius: 8px;
+    transition: background 150ms ease;
+  }
+  .completed-head:hover {
+    background: var(--smoke-2);
+  }
 
   /* ============ HABIT ROW ============ */
   .habit-list { display: flex; flex-direction: column; gap: 6px; }
