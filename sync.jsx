@@ -113,7 +113,8 @@
 
   // ---- habits ----
   async function loadHabits() {
-    const { data: rows, error } = await sb().from('habits').select('*').is('deleted_at', null);
+    const id = await uid(); if (!id) return [];
+    const { data: rows, error } = await sb().from('habits').select('*').eq('user_id', id).is('deleted_at', null);
     if (error) throw error;
     const ids = rows.map((r) => r.id);
     let comps = [];
