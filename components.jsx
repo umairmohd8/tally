@@ -962,6 +962,7 @@ function IndividualPauseModal({ habit, onClose, onConfirm }) {
   }, [onClose]);
 
   const submit = () => {
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
     let pausedUntil = null;
     if (duration !== 'indefinite') {
       const days = parseInt(duration, 10) || 7;
@@ -999,7 +1000,10 @@ function IndividualPauseModal({ habit, onClose, onConfirm }) {
                   role="radio"
                   aria-checked={duration === opt.key}
                   className="chip"
-                  onClick={() => setDuration(opt.key)}
+                  onClick={() => {
+                    if (navigator.vibrate) try { navigator.vibrate(8); } catch (_) {}
+                    setDuration(opt.key);
+                  }}
                 >
                   {opt.label}
                 </button>
