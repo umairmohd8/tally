@@ -456,11 +456,8 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--card-2)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              {isIndividuallyPaused ? (
-                <><window.Icons.Play size={13} /> Resume habit</>
-              ) : (
-                <><window.Icons.Pause size={13} /> Pause habit</>
-              )}
+              {isIndividuallyPaused ? <window.Icons.Play size={13} /> : <window.Icons.Pause size={13} />}
+              {isIndividuallyPaused ? 'Resume habit' : 'Pause habit'}
             </button>
             <button
               onClick={() => { onDelete(habit.id); setMenuOpen(false); }}
