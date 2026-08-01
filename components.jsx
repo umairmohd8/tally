@@ -323,7 +323,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
       <button
         className={`check ${done ? 'checked' : ''} ${pulse ? 'pulse' : ''}`}
         onClick={handleToggle}
-        disabled={ended || notStarted}
+        disabled={ended || notStarted || pausedToday}
         aria-label={done ? `Mark ${habit.name} incomplete` : `Mark ${habit.name} complete`}
         style={{ borderColor: done && !ended ? swatch : undefined, background: done && !ended ? swatch : undefined }}
       >
