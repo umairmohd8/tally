@@ -970,6 +970,13 @@ function IndividualPauseModal({ habit, onClose, onConfirm }) {
     onConfirm(habit.id, { isPaused: true, pausedUntil });
   };
 
+  const DURATION_OPTIONS = [
+    { key: 'indefinite', label: 'Until resumed' },
+    { key: '7',          label: '1 week' },
+    { key: '14',         label: '2 weeks' },
+    { key: '30',         label: '30 days' },
+  ];
+
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Pause ${habit?.name}`}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -981,35 +988,37 @@ function IndividualPauseModal({ habit, onClose, onConfirm }) {
           <button className="icon-btn" onClick={onClose} aria-label="Close"><window.Icons.X /></button>
         </div>
 
-        <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(217, 83, 79, 0.08)', border: '1px solid rgba(217, 83, 79, 0.2)', borderRadius: '8px', fontSize: '13px', color: 'var(--ink)' }}>
-          <strong style={{ color: 'var(--pop)' }}>Note:</strong> Pausing an individual habit resets its active streak to 0. When resumed, you start a fresh streak.
+        <div className="modal-body">
+          <div className="field">
+            <div className="field-label">Pause duration</div>
+            <div className="chip-row" role="radiogroup" aria-label="Pause duration">
+              {DURATION_OPTIONS.map(opt => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={duration === opt.key}
+                  className="chip"
+                  onClick={() => setDuration(opt.key)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pause-promise" style={{ color: 'var(--ink-70)' }}>
+            <strong style={{ color: 'var(--pop)', fontWeight: 600 }}>Note:</strong> Pausing an individual habit resets its streak to 0. Resume anytime to start a fresh streak.
+          </div>
         </div>
 
-        <div className="field-label" style={{ marginTop: 16 }}>Pause duration</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 8 }}>
-          {[
-            { key: 'indefinite', label: 'Until resumed' },
-            { key: '7', label: '1 week (7 days)' },
-            { key: '14', label: '2 weeks (14 days)' },
-            { key: '30', label: '30 days' },
-          ].map(opt => (
-            <button
-              key={opt.key}
-              type="button"
-              className={`chip ${duration === opt.key ? 'active' : ''}`}
-              style={{ padding: '8px 12px', textAlign: 'center', justifyContent: 'center' }}
-              onClick={() => setDuration(opt.key)}
-            >
-              {opt.label}
+        <div className="modal-foot">
+          <div className="modal-foot-end">
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={submit} style={{ background: 'var(--pop)', borderColor: 'var(--pop)' }}>
+              Pause habit
             </button>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit} style={{ background: 'var(--pop)', borderColor: 'var(--pop)' }}>
-            Pause habit & reset streak
-          </button>
+          </div>
         </div>
       </div>
     </div>
