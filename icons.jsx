@@ -14,7 +14,13 @@ const Icons = {
   Flame:   (p) => <Icon {...p} d={["M12 3c2 4 6 5 6 10a6 6 0 1 1-12 0c0-3 1-4 2-5 0 2 1 3 2 3 0-3 0-6 2-8z"]} />,
   Calendar:(p) => <Icon {...p} d={["M3 8h18", "M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M8 2v4", "M16 2v4"]} />,
   Trash:   (p) => <Icon {...p} d={["M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", "M19 6l-1 13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"]} />,
-  More:    (p) => <Icon {...p} d={["M5 12h.01", "M12 12h.01", "M19 12h.01"]} stroke={2.4} />,
+  More:    (p) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={p?.size || 18} height={p?.size || 18} {...p}>
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  ),
   Trend:   (p) => <Icon {...p} d={["M3 17l6-6 4 4 8-8", "M14 7h7v7"]} />,
   Bell:    (p) => <Icon {...p} d={["M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z", "M10 21a2 2 0 0 0 4 0"]} />,
   Chevron: (p) => <Icon {...p} d="M9 6l6 6-6 6" />,
