@@ -86,18 +86,25 @@ function scheduleLabel(habit) {
 }
 
 // ---- Pause ----
-// Pause windows bridge: days inside are neither credited nor counted as slips.
-function isPausedOn(date, pause) {
-  if (!pause) return false;
+// Global pause bridges days. Individual habit pause resets/kills the streak (returns 0).
+function isPausedOn(date, pause, habit) {
   const k = dayKey(date);
-  return k >= pause.startDate && k <= pause.endDate;
+  if (pause && k >= pause.startDate && k <= pause.endDate) return true;
+  if (habit && habit.isPaused) {
+    if (!habit.pausedUntil) return true;
+    if (k <= habit.pausedUntil) return true;
+  }
+  return false;
 }
 
 // ---- Streak: "Don't miss twice" ----
 // Walk back; allow exactly ONE missed scheduled day before resetting.
 // Today only counts if completed; an uncompleted today is treated as "in progress" (skipped, not slipped).
-// Pause days bridge: skipped entirely, no credit, no slip cost. Strict — slip allowance does not refresh across a pause.
+// Global pause days bridge: skipped entirely, no credit, no slip cost.
+// Individual habit pause kills/resets streak to 0.
 function computeStreak(habit, today, pause) {
+  if (isPausedOn(today, null, habit)) return 0;
+
   const sc = getSchedule(habit);
   if (sc.type === 'weekly_count') {
     const target = sc.count || 1;
@@ -106,6 +113,7 @@ function computeStreak(habit, today, pause) {
     let cursor = addDays(startOfWeek(today), -7);
     for (let i = 0; i < 104; i++) {
       if (isNotStarted(habit, cursor)) break;
+      if (isPausedOn(cursor, null, habit)) break; // individual pause breaks streak
       if (weekCompletions(habit, cursor, pause) >= target) weeks++;
       else break;
       cursor = addDays(cursor, -7);
@@ -115,12 +123,16 @@ function computeStreak(habit, today, pause) {
   let streak = 0;
   let allowedSlip = 1;
   let cur = new Date(today);
-  if (!habit.completions[dayKey(cur)] && isScheduled(habit, cur) && !isPausedOn(cur, pause)) {
+  if (!habit.completions[dayKey(cur)] && isScheduled(habit, cur) && !isPausedOn(cur, pause, habit)) {
     cur = addDays(cur, -1);
   }
   for (let i = 0; i < 365; i++) {
     if (isNotStarted(habit, cur)) break;
-    if (isPausedOn(cur, pause)) {
+    // Individual habit pause breaks the streak chain
+    if (isPausedOn(cur, null, habit)) {
+      break;
+    }
+    if (isPausedOn(cur, pause)) { // Global pause bridges
       // bridge
     } else if (isScheduled(habit, cur)) {
       if (habit.completions[dayKey(cur)]) {
@@ -142,13 +154,13 @@ function slippedYesterday(habit, today, pause) {
   if (getSchedule(habit).type === 'weekly_count') return false;
   const yesterday = addDays(today, -1);
   if (isNotStarted(habit, yesterday)) return false;
-  if (isPausedOn(yesterday, pause)) return false;
+  if (isPausedOn(yesterday, pause, habit)) return false;
   if (!isScheduled(habit, yesterday)) return false;
   if (habit.completions[dayKey(yesterday)]) return false;
   for (let i = 2; i < 6; i++) {
     const d = addDays(today, -i);
     if (isNotStarted(habit, d)) break;
-    if (isPausedOn(d, pause)) continue;
+    if (isPausedOn(d, pause, habit)) continue;
     if (habit.completions[dayKey(d)]) return true;
   }
   return false;
@@ -160,7 +172,7 @@ function weekCompletions(habit, anyDateInWeek, pause) {
   for (let i = 0; i < 7; i++) {
     const d = addDays(start, i);
     if (isNotStarted(habit, d)) continue;
-    if (isPausedOn(d, pause)) continue;
+    if (isPausedOn(d, pause, habit)) continue;
     if (habit.completions[dayKey(d)]) n++;
   }
   return n;
@@ -214,7 +226,7 @@ function CheckMark() {
 // ============================================
 // HABIT ROW · the hero interaction lives here
 // ============================================
-function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap }) {
+function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap, onTogglePause }) {
   const {
     colorOf, dayKey, addDays, isScheduled, isNotStarted, computeStreak,
     getSchedule, weekCompletions, scheduleLabel, formatReminderTime,
@@ -231,7 +243,8 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
   const streak = computeStreak(habit, today, pause);
   const timeLabel = formatReminderTime(habit.reminderTime);
   const slipped = slippedYesterday(habit, today, pause);
-  const pausedToday = isPausedOn(today, pause);
+  const pausedToday = isPausedOn(today, pause, habit);
+  const isIndividuallyPaused = habit.isPaused && isPausedOn(today, null, habit);
   const ended = isEnded(habit, today);
   const endedDays = ended && habit.endDate ? dayCountBetween(habit.createdAt || habit.endDate, habit.endDate) : 0;
   const notStarted = isNotStarted(habit, today);
@@ -252,7 +265,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
     const k = dayKey(d);
     const sched = isScheduled(habit, d);
     const filled = !!habit.completions[k];
-    const paused = isPausedOn(d, pause);
+    const paused = isPausedOn(d, pause, habit);
     const isToday = i === 0;
     const isYesterday = i === 1;
     const isDayBeforeYesterday = i === 2;
@@ -261,7 +274,7 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
     if (isYesterday && !filled && sched && !paused && !isWeekly) {
       for (let j = 2; j < 6; j++) {
         const dd = addDays(today, -j);
-        if (isPausedOn(dd, pause)) continue;
+        if (isPausedOn(dd, pause, habit)) continue;
         if (habit.completions[dayKey(dd)]) { slippedDot = true; break; }
       }
     }
@@ -322,6 +335,9 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
         <div className="habit-name">
           <span className="swatch" style={{ background: swatch }} />
           <span className="habit-name-text">{habit.name}</span>
+          {isIndividuallyPaused && (
+            <span className="meta-pill paused" style={{ background: 'rgba(217, 83, 79, 0.1)', color: 'var(--pop)', border: '1px solid rgba(217, 83, 79, 0.3)' }} title="Individual habit is paused (streak reset)">⏸ paused</span>
+          )}
           {ended && (
             <span className="meta-pill finished">{endedDays > 0 ? `done · ${endedDays} day${endedDays === 1 ? '' : 's'}` : 'finished'}</span>
           )}
@@ -430,6 +446,21 @@ function HabitRow({ habit, today, pause, onToggle, onDelete, onEdit, onPausedTap
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <window.Icons.Edit size={13} /> Edit habit
+            </button>
+            <button
+              onClick={() => { onTogglePause && onTogglePause(habit, !isIndividuallyPaused); setMenuOpen(false); }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6,
+                fontSize: 13, color: isIndividuallyPaused ? 'var(--ink)' : 'var(--pop)', display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--card-2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              {isIndividuallyPaused ? (
+                <><window.Icons.Play size={13} /> Resume habit</>
+              ) : (
+                <><window.Icons.Pause size={13} /> Pause habit</>
+              )}
             </button>
             <button
               onClick={() => { onDelete(habit.id); setMenuOpen(false); }}
@@ -921,10 +952,77 @@ function PauseModal({ onClose, onPause }) {
   );
 }
 
+// Individual Habit Pause Modal
+function IndividualPauseModal({ habit, onClose, onConfirm }) {
+  const { dayKey, addDays } = window.HabitUtils;
+  const todayD = new Date();
+  const [duration, setDuration] = React.useState('indefinite');
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const submit = () => {
+    let pausedUntil = null;
+    if (duration !== 'indefinite') {
+      const days = parseInt(duration, 10) || 7;
+      pausedUntil = dayKey(addDays(todayD, days - 1));
+    }
+    onConfirm(habit.id, { isPaused: true, pausedUntil });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Pause ${habit?.name}`}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <div className="modal-eyebrow">Pause habit</div>
+            <div className="modal-title">Pause "{habit?.name}"?</div>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><window.Icons.X /></button>
+        </div>
+
+        <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(217, 83, 79, 0.08)', border: '1px solid rgba(217, 83, 79, 0.2)', borderRadius: '8px', fontSize: '13px', color: 'var(--ink)' }}>
+          <strong style={{ color: 'var(--pop)' }}>Note:</strong> Pausing an individual habit resets its active streak to 0. When resumed, you start a fresh streak.
+        </div>
+
+        <div className="field-label" style={{ marginTop: 16 }}>Pause duration</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 8 }}>
+          {[
+            { key: 'indefinite', label: 'Until resumed' },
+            { key: '7', label: '1 week (7 days)' },
+            { key: '14', label: '2 weeks (14 days)' },
+            { key: '30', label: '30 days' },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`chip ${duration === opt.key ? 'active' : ''}`}
+              style={{ padding: '8px 12px', textAlign: 'center', justifyContent: 'center' }}
+              onClick={() => setDuration(opt.key)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={submit} style={{ background: 'var(--pop)', borderColor: 'var(--pop)' }}>
+            Pause habit & reset streak
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Back-compat alias: original AddHabitModal used onAdd; map it onto HabitModal's onSubmit.
 function AddHabitModal({ onClose, onAdd, defaultTimeOfDay }) {
   return <HabitModal habit={null} onClose={onClose} onSubmit={onAdd} onArchive={null} defaultTimeOfDay={defaultTimeOfDay} />;
 }
 
-window.Components = { HabitRow, HabitModal, AddHabitModal, PauseModal, CheckMark };
+window.Components = { HabitRow, HabitModal, AddHabitModal, PauseModal, IndividualPauseModal, CheckMark };
 window.PauseMeta = { PAUSE_PRESETS, PAUSE_REASON_LABEL };

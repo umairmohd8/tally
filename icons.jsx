@@ -19,6 +19,7 @@ const Icons = {
   Bell:    (p) => <Icon {...p} d={["M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z", "M10 21a2 2 0 0 0 4 0"]} />,
   Chevron: (p) => <Icon {...p} d="M9 6l6 6-6 6" />,
   Pause:   (p) => <Icon {...p} d={["M9 5v14", "M15 5v14"]} stroke={1.8} />,
+  Play:    (p) => <Icon {...p} d="M6 4l14 8-14 8V4z" fill="currentColor" stroke={1.8} />,
   Edit:    (p) => <Icon {...p} d={["M14 4l6 6", "M3 21l3.7-.6L20 8l-4-4L4.6 16.3 3 21z"]} />,
   Cloud:   (p) => <Icon {...p} d={["M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.3A3.5 3.5 0 0 1 18 18z"]} />,
 };

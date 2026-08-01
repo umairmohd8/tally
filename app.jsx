@@ -127,6 +127,7 @@ function App() {
   const [modalDefaultTOD, setModalDefaultTOD] = useState(null);
   const [editingHabit, setEditingHabit] = useState(null);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [indivPauseModalHabit, setIndivPauseModalHabit] = useState(null);
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem(LS.THEME);
     if (stored) return stored;
@@ -297,6 +298,30 @@ function App() {
     lsSet(LS.TOUCHED, true);
     if (signedInRef.current) window.Sync.softDeleteHabit(id).catch(() => {});
   }, []);
+
+  const toggleHabitPause = useCallback((habit, targetPauseState) => {
+    if (targetPauseState) {
+      setIndivPauseModalHabit(habit);
+    } else {
+      setHabits(prev => prev.map(h => h.id === habit.id ? { ...h, isPaused: false, pausedUntil: null } : h));
+      lsSet(LS.TOUCHED, true);
+      const updated = { ...habit, isPaused: false, pausedUntil: null };
+      if (signedInRef.current) window.Sync.updateHabit(updated).catch(() => {});
+      showToast(`Resumed · ${habit.name}`);
+    }
+  }, [showToast]);
+
+  const confirmIndividualPause = useCallback((habitId, pauseData) => {
+    const target = habits.find(h => h.id === habitId);
+    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, ...pauseData } : h));
+    lsSet(LS.TOUCHED, true);
+    if (target) {
+      const updated = { ...target, ...pauseData };
+      if (signedInRef.current) window.Sync.updateHabit(updated).catch(() => {});
+    }
+    setIndivPauseModalHabit(null);
+    showToast(`Paused · ${target?.name || 'Habit'} (streak reset)`);
+  }, [habits, showToast]);
 
   const addFriend = useCallback((name, color) => {
     setFriends(prev => [...prev, window.Social.makeFriend(name, color, new Date())]);
@@ -555,7 +580,7 @@ function App() {
                 </div>
                 <div className="habit-list">
                   {list.map(h => (
-                    <HabitRow key={h.id} habit={h} today={today} pause={pause} onToggle={toggle} onDelete={deleteHabit} onEdit={setEditingHabit} onPausedTap={onPausedTap} />
+                    <HabitRow key={h.id} habit={h} today={today} pause={pause} onToggle={toggle} onDelete={deleteHabit} onEdit={setEditingHabit} onPausedTap={onPausedTap} onTogglePause={toggleHabitPause} />
                   ))}
                 </div>
               </div>
@@ -636,6 +661,15 @@ function App() {
         <PauseModal
           onClose={() => setPauseModalOpen(false)}
           onPause={startPause}
+        />
+      )}
+
+      {/* Individual habit pause modal */}
+      {indivPauseModalHabit && (
+        <window.Components.IndividualPauseModal
+          habit={indivPauseModalHabit}
+          onClose={() => setIndivPauseModalHabit(null)}
+          onConfirm={confirmIndividualPause}
         />
       )}
 
